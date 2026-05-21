@@ -1,7 +1,22 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mvn clean:*)"
+      "Bash(mvn clean:*)",
+      "Bash(javac -d /home/archB/bitClicker/out /home/archB/bitClicker/src/main/java/com/atari/spritemaker/model/AtariPalette.java /home/archB/bitClicker/src/main/java/com/atari/spritemaker/model/SpriteModel.java)",
+      "Read(//usr/**)",
+      "Read(//opt/**)",
+      "Bash(git -C /home/archB/bitClicker add src/main/java/com/atari/spritemaker/model/SpriteModel.java)",
+      "Bash(git -C /home/archB/bitClicker commit -m ' *)",
+      "Bash(git -C /home/archB/bitClicker log --oneline -3)",
+      "Bash(javac --version)",
+      "Bash(flatpak list *)",
+      "Bash(snap list *)",
+      "Bash(javac -d /tmp/build src/main/java/com/atari/spritemaker/model/SpriteModel.java src/main/java/com/atari/spritemaker/panels/*.java src/main/java/com/atari/spritemaker/model/AtariPalette.java)",
+      "Bash(git -C /home/archB/bitClicker add src/main/java/com/atari/spritemaker/panels/EditorPanel.java)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(xargs javac *)",
+      "Bash(git -C /home/archB/bitClicker add src/main/java/com/atari/spritemaker/panels/ActionPanel.java)"
     ]
   }
 }
