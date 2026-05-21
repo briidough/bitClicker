@@ -17,7 +17,9 @@ public class ActionPanel extends JPanel implements ChangeListener {
 
     private final SpriteModel model;
     private final JToggleButton btnPencil, btnLine;
-    private final JToggleButton btn32, btn48, btn64, btn128;
+    private final JToggleButton btn32, btn48, btn64, btn80;
+    private JButton btnFillFromImage;
+    private JToggleButton btnShowBgImage;
 
     public ActionPanel(SpriteModel model) {
         this.model = model;
@@ -33,6 +35,10 @@ public class ActionPanel extends JPanel implements ChangeListener {
         add(makeBtn("Export SVG",  e -> exportSvg()));
         add(Box.createVerticalStrut(4));
         add(makeBtn("Paste Image", e -> pasteImage()));
+        add(Box.createVerticalStrut(4));
+        btnFillFromImage = makeBtn("Fill from Image", e -> fillFromImage());
+        btnFillFromImage.setEnabled(false);
+        add(btnFillFromImage);
 
         add(Box.createVerticalStrut(12));
         JLabel toolLbl = new JLabel("Drawing Tool:");
@@ -65,22 +71,31 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btn32  = new JToggleButton("32");
         btn48  = new JToggleButton("48");
         btn64  = new JToggleButton("64");
-        btn128 = new JToggleButton("128");
+        btn80 = new JToggleButton("80");
         btn32.setSelected(true);
 
         ButtonGroup grp = new ButtonGroup();
-        grp.add(btn32); grp.add(btn48); grp.add(btn64); grp.add(btn128);
+        grp.add(btn32); grp.add(btn48); grp.add(btn64); grp.add(btn80);
 
         btn32 .addActionListener(e -> confirmReset(32));
         btn48 .addActionListener(e -> confirmReset(48));
         btn64 .addActionListener(e -> confirmReset(64));
-        btn128.addActionListener(e -> confirmReset(128));
+        btn80.addActionListener(e -> confirmReset(80));
 
         JPanel sizeRow = new JPanel(new GridLayout(1, 4, 2, 0));
-        sizeRow.add(btn32); sizeRow.add(btn48); sizeRow.add(btn64); sizeRow.add(btn128);
+        sizeRow.add(btn32); sizeRow.add(btn48); sizeRow.add(btn64); sizeRow.add(btn80);
         sizeRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         sizeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, sizeRow.getPreferredSize().height));
         add(sizeRow);
+
+        add(Box.createVerticalStrut(12));
+        btnShowBgImage = new JToggleButton("Show Pasted Image");
+        btnShowBgImage.setSelected(true);
+        btnShowBgImage.setEnabled(false);
+        btnShowBgImage.setAlignmentX(Component.LEFT_ALIGNMENT);
+        btnShowBgImage.setMaximumSize(new Dimension(Integer.MAX_VALUE, btnShowBgImage.getPreferredSize().height));
+        btnShowBgImage.addActionListener(e -> model.setShowBgImage(btnShowBgImage.isSelected()));
+        add(btnShowBgImage);
     }
 
     @Override
@@ -89,9 +104,13 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btn32 .setSelected(size == 32);
         btn48 .setSelected(size == 48);
         btn64 .setSelected(size == 64);
-        btn128.setSelected(size == 128);
+        btn80.setSelected(size == 80);
         btnPencil.setSelected(model.getDrawingTool() == DrawingTool.PENCIL);
         btnLine  .setSelected(model.getDrawingTool() == DrawingTool.LINE);
+        boolean hasImage = model.getBgImage() != null;
+        btnFillFromImage.setEnabled(hasImage);
+        btnShowBgImage.setEnabled(hasImage);
+        btnShowBgImage.setSelected(model.isShowBgImage());
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
@@ -115,7 +134,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
             btn32 .setSelected(cur == 32);
             btn48 .setSelected(cur == 48);
             btn64 .setSelected(cur == 64);
-            btn128.setSelected(cur == 128);
+            btn80.setSelected(cur == 80);
         }
     }
 
@@ -217,6 +236,26 @@ public class ActionPanel extends JPanel implements ChangeListener {
             pw.println("</svg>");
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage());
+        }
+    }
+
+    private void fillFromImage() {
+        BufferedImage bg = model.getBgImage();
+        if (bg == null) return;
+        int gridSize = model.getGridSize();
+        int imgW = bg.getWidth(), imgH = bg.getHeight();
+        int totalPx = gridSize * 10;
+        for (int row = 0; row < gridSize; row++) {
+            for (int col = 0; col < gridSize; col++) {
+                int cx = col * 10 + 5;
+                int cy = row * 10 + 5;
+                int px = Math.min(cx * imgW / totalPx, imgW - 1);
+                int py = Math.min(cy * imgH / totalPx, imgH - 1);
+                int argb = bg.getRGB(px, py);
+                if (((argb >>> 24) & 0xFF) > 0) {
+                    model.setCellColor(row, col, new Color(argb & 0x00FFFFFF));
+                }
+            }
         }
     }
 

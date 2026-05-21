@@ -33,7 +33,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
             if (slot < 0) return;
             Color init = model.getPalette()[slot];
             Color chosen = JColorChooser.showDialog(this, "Pick Color", init);
-            if (chosen != null) model.setPaletteSlotColor(slot, chosen);
+            if (chosen != null) { model.setPaletteSlotColor(slot, chosen); eraserBtn.setSelected(false); }
         });
 
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
@@ -128,7 +128,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
             int size = model.getGridSize();
             int totalPx = size * CELL;
 
-            java.awt.image.BufferedImage bg = model.getBgImage();
+            java.awt.image.BufferedImage bg = model.isShowBgImage() ? model.getBgImage() : null;
             if (bg != null) {
                 g2.drawImage(bg, 0, 0, totalPx, totalPx, null);
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
@@ -179,7 +179,10 @@ public class EditorPanel extends JPanel implements ChangeListener {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     int slot = e.getX() / SW;
-                    if (slot >= 0 && slot < 5) model.selectPaletteSlot(slot);
+                    if (slot >= 0 && slot < 5) {
+                        model.selectPaletteSlot(slot);
+                        if (model.getActiveColor() != null) eraserBtn.setSelected(false);
+                    }
                 }
             });
         }

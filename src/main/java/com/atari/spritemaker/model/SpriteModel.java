@@ -19,6 +19,7 @@ public class SpriteModel {
     private int selectedPaletteSlot = 0;
     private DrawingTool drawingTool = DrawingTool.PENCIL;
     private BufferedImage bgImage = null;
+    private boolean showBgImage = true;
     private String filePath = null;
     private final List<ChangeListener> listeners = new ArrayList<>();
 
@@ -41,7 +42,9 @@ public class SpriteModel {
     public void setDrawingTool(DrawingTool t) { drawingTool = t; fireChange(); }
 
     public BufferedImage getBgImage() { return bgImage; }
-    public void setBgImage(BufferedImage img) { bgImage = img; fireChange(); }
+    public void setBgImage(BufferedImage img) { bgImage = img; showBgImage = true; fireChange(); }
+    public boolean isShowBgImage() { return showBgImage; }
+    public void setShowBgImage(boolean show) { showBgImage = show; fireChange(); }
 
     public Color getActiveColor() { return activeColor; }
     public Color[] getPalette() { return palette; }
