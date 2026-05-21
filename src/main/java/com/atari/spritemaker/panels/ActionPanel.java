@@ -308,6 +308,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
                 JOptionPane.showMessageDialog(this, "No image found in clipboard.");
                 return;
             }
+            if (model.getBgImage() != null) model.setBgImage(null);
             model.setBgImage(bi);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Paste failed: " + ex.getMessage());

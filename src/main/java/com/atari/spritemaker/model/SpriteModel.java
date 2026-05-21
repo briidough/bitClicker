@@ -75,6 +75,8 @@ public class SpriteModel {
         selectedPaletteSlot = 0;
         activeColor = Color.BLACK;
         filePath = null;
+        bgImage = null;
+        showBgImage = true;
         fireChange();
     }
 
