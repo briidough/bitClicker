@@ -20,6 +20,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
     private final JToggleButton btn32, btn48, btn64, btn80;
     private JButton btnFillFromImage;
     private JToggleButton btnShowBgImage;
+    private java.io.File lastDir = null;
 
     public ActionPanel(SpriteModel model) {
         this.model = model;
@@ -331,8 +332,14 @@ public class ActionPanel extends JPanel implements ChangeListener {
 
     private File chooseFile(boolean open, String ext) {
         JFileChooser fc = new JFileChooser();
+        if (lastDir != null) fc.setCurrentDirectory(lastDir);
         fc.setFileFilter(new FileNameExtensionFilter(ext.toUpperCase() + " files", ext));
         int result = open ? fc.showOpenDialog(this) : fc.showSaveDialog(this);
-        return result == JFileChooser.APPROVE_OPTION ? fc.getSelectedFile() : null;
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File f = fc.getSelectedFile();
+            lastDir = f.getParentFile();
+            return f;
+        }
+        return null;
     }
 }
