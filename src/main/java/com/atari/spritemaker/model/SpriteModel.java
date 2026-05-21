@@ -1,6 +1,7 @@
 package com.atari.spritemaker.model;
 
 import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.event.ChangeEvent;
@@ -8,12 +9,16 @@ import javax.swing.event.ChangeListener;
 
 public class SpriteModel {
 
+    public enum DrawingTool { PENCIL, LINE }
+
     private int gridSize = 32;
     private final String author = "Briidough";
     private Color[][] grid = new Color[32][32];
-    private Color activeColor = null;
-    private final Color[] palette = new Color[4];
-    private int selectedPaletteSlot = -1;
+    private Color activeColor = Color.BLACK;
+    private final Color[] palette = { Color.BLACK, null, null, null, null };
+    private int selectedPaletteSlot = 0;
+    private DrawingTool drawingTool = DrawingTool.PENCIL;
+    private BufferedImage bgImage = null;
     private String filePath = null;
     private final List<ChangeListener> listeners = new ArrayList<>();
 
@@ -31,6 +36,12 @@ public class SpriteModel {
         grid[row][col] = color;
         fireChange();
     }
+
+    public DrawingTool getDrawingTool() { return drawingTool; }
+    public void setDrawingTool(DrawingTool t) { drawingTool = t; fireChange(); }
+
+    public BufferedImage getBgImage() { return bgImage; }
+    public void setBgImage(BufferedImage img) { bgImage = img; fireChange(); }
 
     public Color getActiveColor() { return activeColor; }
     public Color[] getPalette() { return palette; }
@@ -56,9 +67,10 @@ public class SpriteModel {
     public void resetGrid(int newSize) {
         gridSize = newSize;
         grid = new Color[newSize][newSize];
-        for (int i = 0; i < 4; i++) palette[i] = null;
-        selectedPaletteSlot = -1;
-        activeColor = null;
+        for (int i = 0; i < 5; i++) palette[i] = null;
+        palette[0] = Color.BLACK;
+        selectedPaletteSlot = 0;
+        activeColor = Color.BLACK;
         filePath = null;
         fireChange();
     }

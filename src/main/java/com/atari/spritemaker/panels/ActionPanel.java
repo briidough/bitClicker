@@ -1,17 +1,23 @@
 package com.atari.spritemaker.panels;
 
 import com.atari.spritemaker.model.SpriteModel;
+import com.atari.spritemaker.model.SpriteModel.DrawingTool;
 import javax.swing.*;
 import javax.swing.event.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
+import java.awt.datatransfer.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URI;
+import javax.imageio.ImageIO;
 
 public class ActionPanel extends JPanel implements ChangeListener {
 
     private final SpriteModel model;
-    private final JToggleButton btn32, btn64, btn128;
+    private final JToggleButton btnPencil, btnLine;
+    private final JToggleButton btn32, btn48, btn64, btn128;
 
     public ActionPanel(SpriteModel model) {
         this.model = model;
@@ -25,6 +31,30 @@ public class ActionPanel extends JPanel implements ChangeListener {
         add(makeBtn("Save Sprite", e -> saveSprite()));
         add(Box.createVerticalStrut(4));
         add(makeBtn("Export SVG",  e -> exportSvg()));
+        add(Box.createVerticalStrut(4));
+        add(makeBtn("Paste Image", e -> pasteImage()));
+
+        add(Box.createVerticalStrut(12));
+        JLabel toolLbl = new JLabel("Drawing Tool:");
+        toolLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        add(toolLbl);
+        add(Box.createVerticalStrut(4));
+
+        btnPencil = new JToggleButton("Pencil");
+        btnLine   = new JToggleButton("Line");
+        btnPencil.setSelected(true);
+
+        ButtonGroup toolGrp = new ButtonGroup();
+        toolGrp.add(btnPencil); toolGrp.add(btnLine);
+
+        btnPencil.addActionListener(e -> model.setDrawingTool(DrawingTool.PENCIL));
+        btnLine  .addActionListener(e -> model.setDrawingTool(DrawingTool.LINE));
+
+        JPanel toolRow = new JPanel(new GridLayout(1, 2, 2, 0));
+        toolRow.add(btnPencil); toolRow.add(btnLine);
+        toolRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        toolRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, toolRow.getPreferredSize().height));
+        add(toolRow);
 
         add(Box.createVerticalStrut(12));
         JLabel lbl = new JLabel("Grid Size:");
@@ -33,19 +63,21 @@ public class ActionPanel extends JPanel implements ChangeListener {
         add(Box.createVerticalStrut(4));
 
         btn32  = new JToggleButton("32");
+        btn48  = new JToggleButton("48");
         btn64  = new JToggleButton("64");
         btn128 = new JToggleButton("128");
         btn32.setSelected(true);
 
         ButtonGroup grp = new ButtonGroup();
-        grp.add(btn32); grp.add(btn64); grp.add(btn128);
+        grp.add(btn32); grp.add(btn48); grp.add(btn64); grp.add(btn128);
 
         btn32 .addActionListener(e -> confirmReset(32));
+        btn48 .addActionListener(e -> confirmReset(48));
         btn64 .addActionListener(e -> confirmReset(64));
         btn128.addActionListener(e -> confirmReset(128));
 
-        JPanel sizeRow = new JPanel(new GridLayout(1, 3, 2, 0));
-        sizeRow.add(btn32); sizeRow.add(btn64); sizeRow.add(btn128);
+        JPanel sizeRow = new JPanel(new GridLayout(1, 4, 2, 0));
+        sizeRow.add(btn32); sizeRow.add(btn48); sizeRow.add(btn64); sizeRow.add(btn128);
         sizeRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         sizeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, sizeRow.getPreferredSize().height));
         add(sizeRow);
@@ -55,8 +87,11 @@ public class ActionPanel extends JPanel implements ChangeListener {
     public void stateChanged(ChangeEvent e) {
         int size = model.getGridSize();
         btn32 .setSelected(size == 32);
+        btn48 .setSelected(size == 48);
         btn64 .setSelected(size == 64);
         btn128.setSelected(size == 128);
+        btnPencil.setSelected(model.getDrawingTool() == DrawingTool.PENCIL);
+        btnLine  .setSelected(model.getDrawingTool() == DrawingTool.LINE);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
@@ -78,6 +113,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         } else {
             int cur = model.getGridSize();
             btn32 .setSelected(cur == 32);
+            btn48 .setSelected(cur == 48);
             btn64 .setSelected(cur == 64);
             btn128.setSelected(cur == 128);
         }
@@ -90,7 +126,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         if (file == null) return;
         try (BufferedReader br = new BufferedReader(new FileReader(file))) {
             int newSize = 32;
-            Color[] newPalette = new Color[4];
+            Color[] newPalette = new Color[5];
             Color[][] newGrid = null;
             String section = null, line;
             int row = 0;
@@ -100,7 +136,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
                     newGrid = new Color[newSize][newSize];
                 } else if (line.startsWith("PALETTE=")) {
                     String[] parts = line.substring(8).split(",", -1);
-                    for (int i = 0; i < 4 && i < parts.length; i++)
+                    for (int i = 0; i < 5 && i < parts.length; i++)
                         newPalette[i] = "null".equals(parts[i]) ? null : parseColor(parts[i].trim());
                 } else if ("GRID=".equals(line)) {
                     section = "GRID";
@@ -113,7 +149,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
             }
             if (newGrid != null) {
                 model.resetGrid(newSize);
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < 5; i++)
                     if (newPalette[i] != null) model.setPaletteSlotColor(i, newPalette[i]);
                 for (int r = 0; r < newSize; r++)
                     for (int c = 0; c < newSize; c++)
@@ -138,7 +174,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
             pw.println("SIZE=" + model.getGridSize());
             Color[] pal = model.getPalette();
             StringBuilder palLine = new StringBuilder("PALETTE=");
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 5; i++) {
                 if (i > 0) palLine.append(',');
                 palLine.append(pal[i] == null ? "null" : hex(pal[i]));
             }
@@ -181,6 +217,61 @@ public class ActionPanel extends JPanel implements ChangeListener {
             pw.println("</svg>");
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage());
+        }
+    }
+
+    private void pasteImage() {
+        try {
+            Transferable t = Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null);
+            if (t == null) {
+                JOptionPane.showMessageDialog(this, "Clipboard is empty.");
+                return;
+            }
+            BufferedImage bi = null;
+            if (t.isDataFlavorSupported(DataFlavor.imageFlavor)) {
+                Image img = (Image) t.getTransferData(DataFlavor.imageFlavor);
+                if (img instanceof BufferedImage) {
+                    bi = (BufferedImage) img;
+                } else {
+                    bi = new BufferedImage(img.getWidth(null), img.getHeight(null), BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D g2 = bi.createGraphics();
+                    g2.drawImage(img, 0, 0, null);
+                    g2.dispose();
+                }
+            } else {
+                // Try image/* stream flavors
+                for (DataFlavor f : t.getTransferDataFlavors()) {
+                    if (f.getMimeType().startsWith("image/")
+                            && InputStream.class.isAssignableFrom(f.getRepresentationClass())) {
+                        try (InputStream is = (InputStream) t.getTransferData(f)) {
+                            bi = ImageIO.read(is);
+                            if (bi != null) break;
+                        } catch (Exception ignored) {}
+                    }
+                }
+                // GTK image viewers copy a file URI (text/uri-list) rather than image bytes
+                if (bi == null) {
+                    DataFlavor uriList = new DataFlavor("text/uri-list;class=java.lang.String");
+                    if (t.isDataFlavorSupported(uriList)) {
+                        String uris = (String) t.getTransferData(uriList);
+                        for (String line : uris.split("\\r?\\n")) {
+                            line = line.trim();
+                            if (line.isEmpty() || line.startsWith("#")) continue;
+                            try {
+                                bi = ImageIO.read(new File(new URI(line)));
+                                if (bi != null) break;
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            }
+            if (bi == null) {
+                JOptionPane.showMessageDialog(this, "No image found in clipboard.");
+                return;
+            }
+            model.setBgImage(bi);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Paste failed: " + ex.getMessage());
         }
     }
 

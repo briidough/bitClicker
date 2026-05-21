@@ -1,6 +1,7 @@
 package com.atari.spritemaker.panels;
 
 import com.atari.spritemaker.model.SpriteModel;
+import com.atari.spritemaker.model.SpriteModel.DrawingTool;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.awt.*;
@@ -44,6 +45,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
 
     @Override
     public void stateChanged(ChangeEvent e) {
+        if (model.getDrawingTool() == DrawingTool.PENCIL) gridCanvas.cancelLine();
         pickColorBtn.setEnabled(model.getSelectedPaletteSlot() >= 0);
         paletteBar.repaint();
         gridCanvas.updateSize();
@@ -51,26 +53,66 @@ public class EditorPanel extends JPanel implements ChangeListener {
     }
 
     private class GridCanvas extends JPanel {
+        private int lineStartRow = -1, lineStartCol = -1;
+
         GridCanvas() {
             updateSize();
             MouseAdapter ma = new MouseAdapter() {
-                @Override public void mousePressed(MouseEvent e) { paint(e); }
-                @Override public void mouseDragged(MouseEvent e) { paint(e); }
+                @Override public void mousePressed(MouseEvent e) { handlePress(e); }
+                @Override public void mouseDragged(MouseEvent e) { handleDrag(e); }
 
-                private void paint(MouseEvent e) {
-                    int col = e.getX() / CELL;
-                    int row = e.getY() / CELL;
+                private void handlePress(MouseEvent e) {
+                    int col = e.getX() / CELL, row = e.getY() / CELL;
                     int size = model.getGridSize();
                     if (row < 0 || row >= size || col < 0 || col >= size) return;
-                    if (eraserBtn.isSelected()) {
-                        model.setCellColor(row, col, null);
-                    } else if (model.getActiveColor() != null) {
-                        model.setCellColor(row, col, model.getActiveColor());
+                    if (model.getDrawingTool() == DrawingTool.LINE) {
+                        if (lineStartRow < 0) {
+                            lineStartRow = row;
+                            lineStartCol = col;
+                            repaint();
+                        } else {
+                            drawLine(lineStartRow, lineStartCol, row, col);
+                            lineStartRow = lineStartCol = -1;
+                        }
+                    } else {
+                        paintCell(row, col);
                     }
+                }
+
+                private void handleDrag(MouseEvent e) {
+                    if (model.getDrawingTool() != DrawingTool.PENCIL) return;
+                    int col = e.getX() / CELL, row = e.getY() / CELL;
+                    int size = model.getGridSize();
+                    if (row < 0 || row >= size || col < 0 || col >= size) return;
+                    paintCell(row, col);
                 }
             };
             addMouseListener(ma);
             addMouseMotionListener(ma);
+        }
+
+        void cancelLine() { lineStartRow = lineStartCol = -1; }
+
+        private void paintCell(int row, int col) {
+            if (eraserBtn.isSelected()) {
+                model.setCellColor(row, col, null);
+            } else if (model.getActiveColor() != null) {
+                model.setCellColor(row, col, model.getActiveColor());
+            }
+        }
+
+        private void drawLine(int r1, int c1, int r2, int c2) {
+            int dx = Math.abs(c2 - c1), dy = Math.abs(r2 - r1);
+            int sc = c1 < c2 ? 1 : -1, sr = r1 < r2 ? 1 : -1;
+            int err = dx - dy;
+            int size = model.getGridSize();
+            while (true) {
+                if (r1 >= 0 && r1 < size && c1 >= 0 && c1 < size) paintCell(r1, c1);
+                if (r1 == r2 && c1 == c2) break;
+                int e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; c1 += sc; }
+                if (e2 < dx)  { err += dx; r1 += sr; }
+            }
         }
 
         void updateSize() {
@@ -82,20 +124,38 @@ public class EditorPanel extends JPanel implements ChangeListener {
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
             int size = model.getGridSize();
+            int totalPx = size * CELL;
+
+            java.awt.image.BufferedImage bg = model.getBgImage();
+            if (bg != null) {
+                g2.drawImage(bg, 0, 0, totalPx, totalPx, null);
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
+            }
+
             for (int row = 0; row < size; row++) {
                 for (int col = 0; col < size; col++) {
                     Color c = model.getCellColor(row, col);
                     int x = col * CELL, y = row * CELL;
                     if (c == null) {
-                        drawCheckerboard(g, x, y);
+                        drawCheckerboard(g2, x, y);
                     } else {
-                        g.setColor(c);
-                        g.fillRect(x, y, CELL, CELL);
+                        g2.setColor(c);
+                        g2.fillRect(x, y, CELL, CELL);
                     }
-                    g.setColor(Color.LIGHT_GRAY);
-                    g.drawRect(x, y, CELL, CELL);
+                    g2.setColor(Color.LIGHT_GRAY);
+                    g2.drawRect(x, y, CELL, CELL);
                 }
+            }
+
+            if (bg != null) g2.setComposite(AlphaComposite.SrcOver);
+
+            if (lineStartRow >= 0) {
+                int x = lineStartCol * CELL, y = lineStartRow * CELL;
+                g2.setColor(Color.WHITE);
+                g2.drawRect(x, y, CELL - 1, CELL - 1);
+                g2.drawRect(x + 1, y + 1, CELL - 3, CELL - 3);
             }
         }
 
@@ -114,12 +174,12 @@ public class EditorPanel extends JPanel implements ChangeListener {
         private static final int SW = 56, SH = 32;
 
         PaletteBar() {
-            setPreferredSize(new Dimension(SW * 4, SH));
+            setPreferredSize(new Dimension(SW * 5, SH));
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     int slot = e.getX() / SW;
-                    if (slot >= 0 && slot < 4) model.selectPaletteSlot(slot);
+                    if (slot >= 0 && slot < 5) model.selectPaletteSlot(slot);
                 }
             });
         }
@@ -129,7 +189,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
             super.paintComponent(g);
             Color[] pal = model.getPalette();
             int selected = model.getSelectedPaletteSlot();
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 5; i++) {
                 int x = i * SW;
                 if (pal[i] == null) {
                     drawSlotCheckerboard(g, x);

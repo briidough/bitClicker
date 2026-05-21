@@ -8,13 +8,13 @@ Maven is **not installed** on this machine. Use `javac` and `jar` directly.
 
 ```bash
 # Compile
-find src -name "*.java" | sort | xargs javac -d out
+find src -name "*.java" | sort | xargs $JAVA_HOME/bin/javac -d out
 
 # Package
-jar cfe sprite-editor.jar com.atari.spritemaker.Main -C out .
+$JAVA_HOME/bin/jar cfe sprite-editor.jar com.atari.spritemaker.Main -C out .
 
 # Run
-java -jar sprite-editor.jar
+$JAVA_HOME/bin/java -jar sprite-editor.jar
 ```
 
 No external dependencies — pure Java 11+ with Swing only.
