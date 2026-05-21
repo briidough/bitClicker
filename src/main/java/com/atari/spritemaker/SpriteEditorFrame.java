@@ -1,48 +1,34 @@
 package com.atari.spritemaker;
 
 import com.atari.spritemaker.model.SpriteModel;
-import com.atari.spritemaker.panels.ActionPanel;
-import com.atari.spritemaker.panels.EditorPanel;
-import com.atari.spritemaker.panels.HexMirrorPanel;
-
+import com.atari.spritemaker.panels.*;
 import javax.swing.*;
 import java.awt.*;
 
 public class SpriteEditorFrame extends JFrame {
 
     public SpriteEditorFrame() {
-        super("Atari 2600 Sprite Editor");
+        super("Sprite Editor");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
 
         SpriteModel model = new SpriteModel();
+        ActionPanel  actionPanel  = new ActionPanel(model);
+        EditorPanel  editorPanel  = new EditorPanel(model);
+        PreviewPanel previewPanel = new PreviewPanel(model);
 
-        EditorPanel    editorPanel    = new EditorPanel(model);
-        HexMirrorPanel hexMirrorPanel = new HexMirrorPanel(model);
-        ActionPanel    actionPanel    = new ActionPanel(model);
-
-        // Both panels listen for model changes and repaint themselves
+        model.addChangeListener(actionPanel);
         model.addChangeListener(editorPanel);
-        model.addChangeListener(hexMirrorPanel);
+        model.addChangeListener(previewPanel);
 
-        // Hex mirror is wide — put it in a scroll pane
-        JScrollPane mirrorScroll = new JScrollPane(hexMirrorPanel,
-                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        mirrorScroll.setBorder(null);
-        mirrorScroll.setPreferredSize(new Dimension(660, 500));
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+            editorPanel, previewPanel);
+        split.setResizeWeight(0.7);
 
-        // Split editor / hex mirror so the user can resize
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-                editorPanel, mirrorScroll);
-        splitPane.setResizeWeight(0.5);
-        splitPane.setOneTouchExpandable(true);
-
-        setLayout(new BorderLayout(6, 0));
         add(actionPanel, BorderLayout.WEST);
-        add(splitPane,   BorderLayout.CENTER);
+        add(split, BorderLayout.CENTER);
 
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         pack();
+        setMinimumSize(new Dimension(900, 600));
         setLocationRelativeTo(null);
-        setResizable(true);
     }
 }
