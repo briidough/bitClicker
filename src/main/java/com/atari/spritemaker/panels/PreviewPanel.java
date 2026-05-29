@@ -2,6 +2,7 @@ package com.atari.spritemaker.panels;
 
 import com.atari.spritemaker.model.SpriteModel;
 import com.atari.spritemaker.model.SpriteModel.Mode;
+import com.atari.spritemaker.ui.RetroTheme;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.awt.*;
@@ -221,7 +222,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         private void paintTransform(Graphics g) {
             List<Color[][]> frames = model.getAnimationFrames();
             if (frames.isEmpty()) {
-                g.setColor(Color.GRAY);
+                g.setColor(RetroTheme.noFramesTextColor());
                 g.drawString("No frames loaded", 8, 20);
                 return;
             }
@@ -268,10 +269,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
 
         private void drawCheckerboard(Graphics g, int x, int y) {
             int half = CELL / 2;
-            g.setColor(Color.decode("#cccccc"));
+            g.setColor(RetroTheme.checkA());
             g.fillRect(x, y, half, half);
             g.fillRect(x + half, y + half, half, half);
-            g.setColor(Color.WHITE);
+            g.setColor(RetroTheme.checkB());
             g.fillRect(x + half, y, half, half);
             g.fillRect(x, y + half, half, half);
         }

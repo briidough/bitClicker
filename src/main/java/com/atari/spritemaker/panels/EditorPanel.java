@@ -3,6 +3,7 @@ package com.atari.spritemaker.panels;
 import com.atari.spritemaker.model.SpriteModel;
 import com.atari.spritemaker.model.SpriteModel.DrawingTool;
 import com.atari.spritemaker.model.SpriteModel.Mode;
+import com.atari.spritemaker.ui.RetroTheme;
 import java.awt.Color;
 import javax.swing.*;
 import javax.swing.event.*;
@@ -195,7 +196,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
                         g2.setColor(c);
                         g2.fillRect(x, y, CELL, CELL);
                     }
-                    g2.setColor(Color.LIGHT_GRAY);
+                    g2.setColor(RetroTheme.gridLine());
                     g2.drawRect(x, y, CELL, CELL);
                 }
             }
@@ -212,10 +213,10 @@ public class EditorPanel extends JPanel implements ChangeListener {
 
         private void drawCheckerboard(Graphics g, int x, int y) {
             int half = CELL / 2;
-            g.setColor(Color.decode("#cccccc"));
+            g.setColor(RetroTheme.checkA());
             g.fillRect(x, y, half, half);
             g.fillRect(x + half, y + half, half, half);
-            g.setColor(Color.WHITE);
+            g.setColor(RetroTheme.checkB());
             g.fillRect(x + half, y, half, half);
             g.fillRect(x, y + half, half, half);
         }
@@ -251,7 +252,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
                     g.setColor(pal[i]);
                     g.fillRect(x, 0, SW, SH);
                 }
-                g.setColor(i == selected ? Color.WHITE : Color.DARK_GRAY);
+                g.setColor(i == selected ? RetroTheme.paletteSelectBorder() : RetroTheme.paletteUnselectBorder());
                 g.drawRect(x, 0, SW - 1, SH - 1);
                 if (i == selected) g.drawRect(x + 1, 1, SW - 3, SH - 3);
             }
@@ -262,7 +263,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
             for (int dy = 0; dy < SH; dy += sq) {
                 for (int dx = 0; dx < SW; dx += sq) {
                     g.setColor(((dx / sq + dy / sq) % 2 == 0)
-                        ? Color.decode("#cccccc") : Color.WHITE);
+                        ? RetroTheme.checkA() : RetroTheme.checkB());
                     g.fillRect(x + dx, dy, Math.min(sq, SW - dx), Math.min(sq, SH - dy));
                 }
             }

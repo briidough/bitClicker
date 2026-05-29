@@ -2,6 +2,7 @@ package com.atari.spritemaker;
 
 import com.atari.spritemaker.model.SpriteModel;
 import com.atari.spritemaker.panels.*;
+import com.atari.spritemaker.ui.RetroTheme;
 import javax.swing.*;
 import java.awt.*;
 
@@ -50,6 +51,17 @@ public class SpriteEditorFrame extends JFrame {
         fileMenu.add(miLoadSvg);
 
         menuBar.add(fileMenu);
+
+        // ── theme toggle ──────────────────────────────────────────────────────
+        JCheckBoxMenuItem miRetro = new JCheckBoxMenuItem("Retro Theme");
+        miRetro.addActionListener(e -> {
+            if (miRetro.isSelected()) RetroTheme.apply();
+            else                      RetroTheme.reset();
+            SwingUtilities.updateComponentTreeUI(this);
+            repaint();
+        });
+        menuBar.add(miRetro);
+
         setJMenuBar(menuBar);
 
         // ── layout ────────────────────────────────────────────────────────────
