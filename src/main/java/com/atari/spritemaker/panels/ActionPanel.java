@@ -12,6 +12,10 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URI;
 import javax.imageio.ImageIO;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 public class ActionPanel extends JPanel implements ChangeListener {
 
@@ -34,6 +38,8 @@ public class ActionPanel extends JPanel implements ChangeListener {
         add(makeBtn("Save Sprite", e -> saveSprite()));
         add(Box.createVerticalStrut(4));
         add(makeBtn("Export SVG",  e -> exportSvg()));
+        add(Box.createVerticalStrut(4));
+        add(makeBtn("Load SVG",    e -> loadSvg()));
         add(Box.createVerticalStrut(4));
         add(makeBtn("Paste Image", e -> pasteImage()));
         add(Box.createVerticalStrut(4));
@@ -238,6 +244,106 @@ public class ActionPanel extends JPanel implements ChangeListener {
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage());
         }
+    }
+
+    private void loadSvg() {
+        File file = chooseFile(true, "svg");
+        if (file == null) return;
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setNamespaceAware(true);
+            Document doc = dbf.newDocumentBuilder().parse(file);
+            NodeList rects = doc.getElementsByTagNameNS("*", "rect");
+            if (rects.getLength() == 0) {
+                JOptionPane.showMessageDialog(this, "No rect elements found in SVG.");
+                return;
+            }
+
+            double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
+            double totalW = 0;
+            int wCount = 0;
+            for (int i = 0; i < rects.getLength(); i++) {
+                Element r = (Element) rects.item(i);
+                double w = parseDouble(r.getAttribute("width"));
+                if (w > 0) { totalW += w; wCount++; }
+                double x = parseDouble(r.getAttribute("x"));
+                double y = parseDouble(r.getAttribute("y"));
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+            }
+
+            if (wCount == 0) {
+                JOptionPane.showMessageDialog(this, "Could not determine cell size from SVG.");
+                return;
+            }
+            double cellSize = totalW / wCount;
+
+            java.util.List<int[]> cells = new java.util.ArrayList<>();
+            int maxCol = 0, maxRow = 0;
+            for (int i = 0; i < rects.getLength(); i++) {
+                Element r = (Element) rects.item(i);
+                Color c = parseSvgColor(r);
+                if (c == null) continue;
+                int col = (int) Math.round((parseDouble(r.getAttribute("x")) - minX) / cellSize);
+                int row = (int) Math.round((parseDouble(r.getAttribute("y")) - minY) / cellSize);
+                cells.add(new int[]{ col, row, c.getRGB() });
+                if (col > maxCol) maxCol = col;
+                if (row > maxRow) maxRow = row;
+            }
+
+            if (cells.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No colored cells found in SVG.");
+                return;
+            }
+
+            int gridSize = -1;
+            for (int s : new int[]{ 32, 48, 64, 80 }) {
+                if (maxCol < s && maxRow < s) { gridSize = s; break; }
+            }
+            if (gridSize == -1) {
+                JOptionPane.showMessageDialog(this,
+                    "SVG is too large (" + (maxCol + 1) + "×" + (maxRow + 1) + " cells). Max supported: 80×80.");
+                return;
+            }
+
+            model.resetGrid(gridSize);
+            for (int[] cell : cells)
+                model.setCellColor(cell[1], cell[0], new Color(cell[2]));
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Load SVG failed: " + ex.getMessage());
+        }
+    }
+
+    private Color parseSvgColor(Element rect) {
+        String fill = rect.getAttribute("fill");
+        if (fill != null && !fill.isEmpty() && !fill.equals("none")) {
+            return parseHexColor(fill);
+        }
+        String style = rect.getAttribute("style");
+        if (style != null && !style.isEmpty()) {
+            for (String prop : style.split(";")) {
+                prop = prop.trim();
+                if (prop.startsWith("fill:")) {
+                    String val = prop.substring(5).trim();
+                    if (!val.equals("none")) return parseHexColor(val);
+                }
+            }
+        }
+        return null;
+    }
+
+    private Color parseHexColor(String s) {
+        if (s == null) return null;
+        s = s.trim();
+        if (s.startsWith("#")) s = s.substring(1);
+        try { return new Color(Integer.parseInt(s, 16)); }
+        catch (NumberFormatException e) { return null; }
+    }
+
+    private double parseDouble(String s) {
+        if (s == null || s.isEmpty()) return 0;
+        try { return Double.parseDouble(s); }
+        catch (NumberFormatException e) { return 0; }
     }
 
     private void fillFromImage() {
