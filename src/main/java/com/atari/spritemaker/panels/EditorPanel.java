@@ -2,6 +2,8 @@ package com.atari.spritemaker.panels;
 
 import com.atari.spritemaker.model.SpriteModel;
 import com.atari.spritemaker.model.SpriteModel.DrawingTool;
+import com.atari.spritemaker.model.SpriteModel.Mode;
+import java.awt.Color;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.awt.*;
@@ -15,6 +17,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
     private final PaletteBar paletteBar;
     private final JButton pickColorBtn;
     private final JToggleButton eraserBtn;
+    private final JPanel controlsPanel;
 
     public EditorPanel(SpriteModel model) {
         this.model = model;
@@ -36,16 +39,19 @@ public class EditorPanel extends JPanel implements ChangeListener {
             if (chosen != null) { model.setPaletteSlotColor(slot, chosen); eraserBtn.setSelected(false); }
         });
 
-        JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        controls.add(paletteBar);
-        controls.add(pickColorBtn);
-        controls.add(eraserBtn);
-        add(controls, BorderLayout.NORTH);
+        controlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        controlsPanel.add(paletteBar);
+        controlsPanel.add(pickColorBtn);
+        controlsPanel.add(eraserBtn);
+        add(controlsPanel, BorderLayout.NORTH);
     }
 
     @Override
     public void stateChanged(ChangeEvent e) {
+        boolean isTransform = model.getMode() == Mode.TRANSFORM;
+        controlsPanel.setVisible(!isTransform);
         if (model.getDrawingTool() == DrawingTool.PENCIL) gridCanvas.cancelLine();
+        if (model.getDrawingTool() != DrawingTool.DRAG)   gridCanvas.clearDrag();
         pickColorBtn.setEnabled(model.getSelectedPaletteSlot() >= 0);
         paletteBar.repaint();
         gridCanvas.updateSize();
@@ -54,17 +60,29 @@ public class EditorPanel extends JPanel implements ChangeListener {
 
     private class GridCanvas extends JPanel {
         private int lineStartRow = -1, lineStartCol = -1;
+        private int dragStartRow = -1, dragStartCol = -1;
+        private Color[][] dragSnapshot = null;
 
         GridCanvas() {
             updateSize();
             MouseAdapter ma = new MouseAdapter() {
-                @Override public void mousePressed(MouseEvent e) { handlePress(e); }
-                @Override public void mouseDragged(MouseEvent e) { handleDrag(e); }
+                @Override public void mousePressed(MouseEvent e)  { handlePress(e); }
+                @Override public void mouseDragged(MouseEvent e)  { handleDrag(e); }
+                @Override public void mouseReleased(MouseEvent e) { clearDrag(); }
 
                 private void handlePress(MouseEvent e) {
+                    if (model.getMode() == Mode.TRANSFORM) return;
                     int col = e.getX() / CELL, row = e.getY() / CELL;
                     int size = model.getGridSize();
                     if (row < 0 || row >= size || col < 0 || col >= size) return;
+                    if (model.getDrawingTool() == DrawingTool.DRAG) {
+                        if (model.getCellColor(row, col) != null) {
+                            dragStartRow = row;
+                            dragStartCol = col;
+                            dragSnapshot = model.getGridCopy();
+                        }
+                        return;
+                    }
                     if (model.getDrawingTool() == DrawingTool.LINE) {
                         if (lineStartRow < 0) {
                             lineStartRow = row;
@@ -80,6 +98,13 @@ public class EditorPanel extends JPanel implements ChangeListener {
                 }
 
                 private void handleDrag(MouseEvent e) {
+                    if (model.getMode() == Mode.TRANSFORM) return;
+                    if (model.getDrawingTool() == DrawingTool.DRAG) {
+                        if (dragSnapshot == null) return;
+                        int col = e.getX() / CELL, row = e.getY() / CELL;
+                        applyDrag(row - dragStartRow, col - dragStartCol);
+                        return;
+                    }
                     if (model.getDrawingTool() != DrawingTool.PENCIL) return;
                     int col = e.getX() / CELL, row = e.getY() / CELL;
                     int size = model.getGridSize();
@@ -92,6 +117,32 @@ public class EditorPanel extends JPanel implements ChangeListener {
         }
 
         void cancelLine() { lineStartRow = lineStartCol = -1; }
+        void clearDrag()  { dragStartRow = dragStartCol = -1; dragSnapshot = null; }
+
+        private void applyDrag(int dr, int dc) {
+            int size = model.getGridSize();
+            // Compute bounding box of all non-null cells in snapshot
+            int minR = size, maxR = -1, minC = size, maxC = -1;
+            for (int r = 0; r < size; r++)
+                for (int c = 0; c < size; c++)
+                    if (dragSnapshot[r][c] != null) {
+                        if (r < minR) minR = r;
+                        if (r > maxR) maxR = r;
+                        if (c < minC) minC = c;
+                        if (c > maxC) maxC = c;
+                    }
+            if (maxR < 0) return;
+            // Clamp offset so no pixel goes out of bounds
+            dr = Math.max(-minR, Math.min(dr, size - 1 - maxR));
+            dc = Math.max(-minC, Math.min(dc, size - 1 - maxC));
+            // Build the shifted grid and write in one shot
+            Color[][] shifted = new Color[size][size];
+            for (int r = 0; r < size; r++)
+                for (int c = 0; c < size; c++)
+                    if (dragSnapshot[r][c] != null)
+                        shifted[r + dr][c + dc] = dragSnapshot[r][c];
+            model.setGrid(shifted);
+        }
 
         private void paintCell(int row, int col) {
             if (eraserBtn.isSelected()) {

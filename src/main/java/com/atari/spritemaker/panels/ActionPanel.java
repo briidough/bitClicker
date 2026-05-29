@@ -2,6 +2,7 @@ package com.atari.spritemaker.panels;
 
 import com.atari.spritemaker.model.SpriteModel;
 import com.atari.spritemaker.model.SpriteModel.DrawingTool;
+import com.atari.spritemaker.model.SpriteModel.Mode;
 import javax.swing.*;
 import javax.swing.event.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -20,55 +21,146 @@ import org.w3c.dom.NodeList;
 public class ActionPanel extends JPanel implements ChangeListener {
 
     private final SpriteModel model;
-    private final JToggleButton btnPencil, btnLine;
+    private final JToggleButton btnPencil, btnLine, btnDrag;
     private final JToggleButton btn32, btn48, btn64, btn80;
     private JButton btnFillFromImage;
+    private JButton btnPasteImage;
     private JToggleButton btnShowBgImage;
+    private JButton transformBtn;
+    private JPanel drawModeControls;
+    private JPanel transformModeControls;
+    private JSlider sliderSpread, sliderSpeed, sliderHold, sliderFocalX, sliderFocalY;
+    private JComboBox<String> comboEasing, comboSpin;
     private java.io.File lastDir = null;
+
+    private static final int DEF_SPREAD = 24, DEF_SPEED = 300, DEF_HOLD = 200;
+    private static final int DEF_EASING = 0,  DEF_FOCAL_X = 50, DEF_FOCAL_Y = 50, DEF_SPIN = 0;
 
     public ActionPanel(SpriteModel model) {
         this.model = model;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
-        add(makeBtn("New Sprite",  e -> confirmReset(model.getGridSize())));
-        add(Box.createVerticalStrut(4));
-        add(makeBtn("Load Sprite", e -> loadSprite()));
-        add(Box.createVerticalStrut(4));
-        add(makeBtn("Save Sprite", e -> saveSprite()));
-        add(Box.createVerticalStrut(4));
-        add(makeBtn("Export SVG",  e -> exportSvg()));
-        add(Box.createVerticalStrut(4));
-        add(makeBtn("Load SVG",    e -> loadSvg()));
-        add(Box.createVerticalStrut(4));
-        add(makeBtn("Paste Image", e -> pasteImage()));
-        add(Box.createVerticalStrut(4));
+        transformBtn = makeBtn("Transform", e -> toggleMode());
+        add(transformBtn);
+
+        // ── draw-mode-only controls ──────────────────────────────────────────
+        drawModeControls = new JPanel();
+        drawModeControls.setLayout(new BoxLayout(drawModeControls, BoxLayout.Y_AXIS));
+        drawModeControls.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        btnPasteImage = makeBtn("Paste Image", e -> pasteImage());
+        drawModeControls.add(Box.createVerticalStrut(4));
+        drawModeControls.add(btnPasteImage);
+
         btnFillFromImage = makeBtn("Fill from Image", e -> fillFromImage());
         btnFillFromImage.setEnabled(false);
-        add(btnFillFromImage);
+        drawModeControls.add(Box.createVerticalStrut(4));
+        drawModeControls.add(btnFillFromImage);
 
-        add(Box.createVerticalStrut(12));
+        drawModeControls.add(Box.createVerticalStrut(12));
         JLabel toolLbl = new JLabel("Drawing Tool:");
         toolLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        add(toolLbl);
-        add(Box.createVerticalStrut(4));
+        drawModeControls.add(toolLbl);
+        drawModeControls.add(Box.createVerticalStrut(4));
 
         btnPencil = new JToggleButton("Pencil");
         btnLine   = new JToggleButton("Line");
+        btnDrag   = new JToggleButton("Drag");
         btnPencil.setSelected(true);
 
         ButtonGroup toolGrp = new ButtonGroup();
-        toolGrp.add(btnPencil); toolGrp.add(btnLine);
+        toolGrp.add(btnPencil); toolGrp.add(btnLine); toolGrp.add(btnDrag);
 
         btnPencil.addActionListener(e -> model.setDrawingTool(DrawingTool.PENCIL));
         btnLine  .addActionListener(e -> model.setDrawingTool(DrawingTool.LINE));
+        btnDrag  .addActionListener(e -> model.setDrawingTool(DrawingTool.DRAG));
 
-        JPanel toolRow = new JPanel(new GridLayout(1, 2, 2, 0));
-        toolRow.add(btnPencil); toolRow.add(btnLine);
+        JPanel toolRow = new JPanel(new GridLayout(1, 3, 2, 0));
+        toolRow.add(btnPencil); toolRow.add(btnLine); toolRow.add(btnDrag);
         toolRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         toolRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, toolRow.getPreferredSize().height));
-        add(toolRow);
+        drawModeControls.add(toolRow);
 
+        drawModeControls.add(Box.createVerticalStrut(12));
+        btnShowBgImage = new JToggleButton("Show Pasted Image");
+        btnShowBgImage.setSelected(true);
+        btnShowBgImage.setEnabled(false);
+        btnShowBgImage.setAlignmentX(Component.LEFT_ALIGNMENT);
+        btnShowBgImage.setMaximumSize(new Dimension(Integer.MAX_VALUE, btnShowBgImage.getPreferredSize().height));
+        btnShowBgImage.addActionListener(e -> model.setShowBgImage(btnShowBgImage.isSelected()));
+        drawModeControls.add(btnShowBgImage);
+
+        add(drawModeControls);
+
+        // ── transform-mode-only controls ─────────────────────────────────────
+        transformModeControls = new JPanel();
+        transformModeControls.setLayout(new BoxLayout(transformModeControls, BoxLayout.Y_AXIS));
+        transformModeControls.setAlignmentX(Component.LEFT_ALIGNMENT);
+        transformModeControls.setVisible(false);
+
+        transformModeControls.add(Box.createVerticalStrut(4));
+        transformModeControls.add(makeBtn("Load Animation Frames", e -> loadAnimationFrames()));
+
+        transformModeControls.add(Box.createVerticalStrut(12));
+
+        sliderSpread = new JSlider(5, 80, model.getAnimSpread());
+        sliderSpread.addChangeListener(e -> model.setAnimSpread(sliderSpread.getValue()));
+        transformModeControls.add(wrapSlider("Spread", sliderSpread));
+
+        transformModeControls.add(Box.createVerticalStrut(6));
+        sliderSpeed = new JSlider(100, 1500, model.getAnimSpeedMs());
+        sliderSpeed.addChangeListener(e -> model.setAnimSpeedMs(sliderSpeed.getValue()));
+        transformModeControls.add(wrapSlider("Speed (ms)", sliderSpeed));
+
+        transformModeControls.add(Box.createVerticalStrut(6));
+        sliderHold = new JSlider(0, 2000, model.getAnimHoldMs());
+        sliderHold.addChangeListener(e -> model.setAnimHoldMs(sliderHold.getValue()));
+        transformModeControls.add(wrapSlider("Hold (ms)", sliderHold));
+
+        transformModeControls.add(Box.createVerticalStrut(8));
+        JLabel easingLbl = new JLabel("Easing:");
+        easingLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        transformModeControls.add(easingLbl);
+        transformModeControls.add(Box.createVerticalStrut(2));
+        comboEasing = new JComboBox<>(new String[]{"Smooth", "Sharp", "Snappy"});
+        comboEasing.setSelectedIndex(model.getAnimEasing());
+        comboEasing.setAlignmentX(Component.LEFT_ALIGNMENT);
+        comboEasing.setMaximumSize(new Dimension(Integer.MAX_VALUE, comboEasing.getPreferredSize().height));
+        comboEasing.addActionListener(e -> model.setAnimEasing(comboEasing.getSelectedIndex()));
+        transformModeControls.add(comboEasing);
+
+        transformModeControls.add(Box.createVerticalStrut(12));
+        JLabel focalLbl = new JLabel("Focal Point:");
+        focalLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        transformModeControls.add(focalLbl);
+        transformModeControls.add(Box.createVerticalStrut(4));
+        sliderFocalX = new JSlider(0, 100, model.getAnimFocalX());
+        sliderFocalX.addChangeListener(e -> model.setAnimFocalX(sliderFocalX.getValue()));
+        transformModeControls.add(wrapSlider("X %", sliderFocalX));
+        transformModeControls.add(Box.createVerticalStrut(4));
+        sliderFocalY = new JSlider(0, 100, model.getAnimFocalY());
+        sliderFocalY.addChangeListener(e -> model.setAnimFocalY(sliderFocalY.getValue()));
+        transformModeControls.add(wrapSlider("Y %", sliderFocalY));
+
+        transformModeControls.add(Box.createVerticalStrut(8));
+        JLabel spinLbl = new JLabel("Spin:");
+        spinLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        transformModeControls.add(spinLbl);
+        transformModeControls.add(Box.createVerticalStrut(2));
+        comboSpin = new JComboBox<>(new String[]{"None", "Clockwise", "Counter-clockwise"});
+        comboSpin.setSelectedIndex(model.getAnimSpin());
+        comboSpin.setAlignmentX(Component.LEFT_ALIGNMENT);
+        comboSpin.setMaximumSize(new Dimension(Integer.MAX_VALUE, comboSpin.getPreferredSize().height));
+        comboSpin.addActionListener(e -> model.setAnimSpin(comboSpin.getSelectedIndex()));
+        transformModeControls.add(comboSpin);
+
+        transformModeControls.add(Box.createVerticalStrut(12));
+        transformModeControls.add(makeBtn("Reset Defaults", e -> resetAnimDefaults()));
+
+        add(transformModeControls);
+
+        // ── grid size (always visible) ────────────────────────────────────────
         add(Box.createVerticalStrut(12));
         JLabel lbl = new JLabel("Grid Size:");
         lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -94,15 +186,6 @@ public class ActionPanel extends JPanel implements ChangeListener {
         sizeRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         sizeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, sizeRow.getPreferredSize().height));
         add(sizeRow);
-
-        add(Box.createVerticalStrut(12));
-        btnShowBgImage = new JToggleButton("Show Pasted Image");
-        btnShowBgImage.setSelected(true);
-        btnShowBgImage.setEnabled(false);
-        btnShowBgImage.setAlignmentX(Component.LEFT_ALIGNMENT);
-        btnShowBgImage.setMaximumSize(new Dimension(Integer.MAX_VALUE, btnShowBgImage.getPreferredSize().height));
-        btnShowBgImage.addActionListener(e -> model.setShowBgImage(btnShowBgImage.isSelected()));
-        add(btnShowBgImage);
     }
 
     @Override
@@ -114,13 +197,43 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btn80.setSelected(size == 80);
         btnPencil.setSelected(model.getDrawingTool() == DrawingTool.PENCIL);
         btnLine  .setSelected(model.getDrawingTool() == DrawingTool.LINE);
+        btnDrag  .setSelected(model.getDrawingTool() == DrawingTool.DRAG);
         boolean hasImage = model.getBgImage() != null;
         btnFillFromImage.setEnabled(hasImage);
         btnShowBgImage.setEnabled(hasImage);
         btnShowBgImage.setSelected(model.isShowBgImage());
+
+        boolean isTransform = model.getMode() == Mode.TRANSFORM;
+        transformBtn.setText(isTransform ? "Draw" : "Transform");
+        drawModeControls.setVisible(!isTransform);
+        transformModeControls.setVisible(isTransform);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
+
+    private JPanel wrapSlider(String name, JSlider slider) {
+        JPanel row = new JPanel();
+        row.setLayout(new BoxLayout(row, BoxLayout.Y_AXIS));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel lbl = new JLabel(name + ": " + slider.getValue());
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        slider.setAlignmentX(Component.LEFT_ALIGNMENT);
+        slider.setMaximumSize(new Dimension(Integer.MAX_VALUE, slider.getPreferredSize().height));
+        slider.addChangeListener(e -> lbl.setText(name + ": " + slider.getValue()));
+        row.add(lbl);
+        row.add(slider);
+        return row;
+    }
+
+    private void resetAnimDefaults() {
+        model.setAnimSpread(DEF_SPREAD);   sliderSpread.setValue(DEF_SPREAD);
+        model.setAnimSpeedMs(DEF_SPEED);   sliderSpeed.setValue(DEF_SPEED);
+        model.setAnimHoldMs(DEF_HOLD);     sliderHold.setValue(DEF_HOLD);
+        model.setAnimEasing(DEF_EASING);   comboEasing.setSelectedIndex(DEF_EASING);
+        model.setAnimFocalX(DEF_FOCAL_X);  sliderFocalX.setValue(DEF_FOCAL_X);
+        model.setAnimFocalY(DEF_FOCAL_Y);  sliderFocalY.setValue(DEF_FOCAL_Y);
+        model.setAnimSpin(DEF_SPIN);       comboSpin.setSelectedIndex(DEF_SPIN);
+    }
 
     private JButton makeBtn(String label, ActionListener al) {
         JButton b = new JButton(label);
@@ -128,6 +241,24 @@ public class ActionPanel extends JPanel implements ChangeListener {
         b.setAlignmentX(Component.LEFT_ALIGNMENT);
         b.setMaximumSize(new Dimension(Integer.MAX_VALUE, b.getPreferredSize().height));
         return b;
+    }
+
+    private void toggleMode() {
+        boolean toTransform = model.getMode() == Mode.DRAW;
+        if (toTransform) {
+            Color[][] copy = model.getGridCopy();
+            boolean hasContent = false;
+            outer:
+            for (Color[] row : copy)
+                for (Color c : row)
+                    if (c != null) { hasContent = true; break outer; }
+            if (hasContent) {
+                java.util.List<Color[][]> frames = new java.util.ArrayList<>();
+                frames.add(copy);
+                model.setAnimationFrames(frames);
+            }
+        }
+        model.setMode(toTransform ? Mode.TRANSFORM : Mode.DRAW);
     }
 
     private void confirmReset(int newSize) {
@@ -145,9 +276,11 @@ public class ActionPanel extends JPanel implements ChangeListener {
         }
     }
 
+    public void newSprite()  { confirmReset(model.getGridSize()); }
+
     // ── I/O ─────────────────────────────────────────────────────────────────
 
-    private void loadSprite() {
+    public void loadSprite() {
         File file = chooseFile(true, "spr");
         if (file == null) return;
         try (BufferedReader br = new BufferedReader(new FileReader(file))) {
@@ -187,7 +320,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         }
     }
 
-    private void saveSprite() {
+    public void saveSprite() {
         String path = model.getFilePath();
         if (path == null) {
             File file = chooseFile(false, "spr");
@@ -221,7 +354,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         }
     }
 
-    private void exportSvg() {
+    public void exportSvg() {
         File file = chooseFile(false, "svg");
         if (file == null) return;
         String path = ensureExt(file.getAbsolutePath(), ".svg");
@@ -246,17 +379,59 @@ public class ActionPanel extends JPanel implements ChangeListener {
         }
     }
 
-    private void loadSvg() {
+    public void loadSvg() {
         File file = chooseFile(true, "svg");
         if (file == null) return;
+        Color[][] grid = parseSvgFile(file);
+        if (grid == null) return;
+        int gridSize = grid.length;
+        model.resetGrid(gridSize);
+        for (int r = 0; r < gridSize; r++)
+            for (int c = 0; c < gridSize; c++)
+                if (grid[r][c] != null) model.setCellColor(r, c, grid[r][c]);
+    }
+
+    private void loadAnimationFrames() {
+        JFileChooser fc = new JFileChooser();
+        if (lastDir != null) fc.setCurrentDirectory(lastDir);
+        fc.setMultiSelectionEnabled(true);
+        fc.setFileFilter(new FileNameExtensionFilter("SVG files", "svg"));
+        if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        File[] files = fc.getSelectedFiles();
+        if (files.length == 0) return;
+        java.util.Arrays.sort(files, java.util.Comparator.comparing(File::getName));
+        lastDir = files[0].getParentFile();
+
+        java.util.List<Color[][]> frames = new java.util.ArrayList<>();
+        for (File f : files) {
+            Color[][] grid = parseSvgFile(f);
+            if (grid != null) frames.add(grid);
+        }
+        if (frames.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No valid SVG frames loaded.");
+            return;
+        }
+        model.setAnimationFrames(frames);
+        applyGridToModel(frames.get(0));
+    }
+
+    private void applyGridToModel(Color[][] frame) {
+        int size = frame.length;
+        model.resetGrid(size);
+        for (int r = 0; r < size; r++)
+            for (int c = 0; c < size; c++)
+                if (frame[r][c] != null) model.setCellColor(r, c, frame[r][c]);
+    }
+
+    private Color[][] parseSvgFile(File file) {
         try {
             DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
             dbf.setNamespaceAware(true);
             Document doc = dbf.newDocumentBuilder().parse(file);
             NodeList rects = doc.getElementsByTagNameNS("*", "rect");
             if (rects.getLength() == 0) {
-                JOptionPane.showMessageDialog(this, "No rect elements found in SVG.");
-                return;
+                JOptionPane.showMessageDialog(this, "No rect elements found in SVG: " + file.getName());
+                return null;
             }
 
             double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
@@ -273,8 +448,8 @@ public class ActionPanel extends JPanel implements ChangeListener {
             }
 
             if (wCount == 0) {
-                JOptionPane.showMessageDialog(this, "Could not determine cell size from SVG.");
-                return;
+                JOptionPane.showMessageDialog(this, "Could not determine cell size from SVG: " + file.getName());
+                return null;
             }
             double cellSize = totalW / wCount;
 
@@ -292,8 +467,8 @@ public class ActionPanel extends JPanel implements ChangeListener {
             }
 
             if (cells.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No colored cells found in SVG.");
-                return;
+                JOptionPane.showMessageDialog(this, "No colored cells found in SVG: " + file.getName());
+                return null;
             }
 
             int gridSize = -1;
@@ -303,14 +478,16 @@ public class ActionPanel extends JPanel implements ChangeListener {
             if (gridSize == -1) {
                 JOptionPane.showMessageDialog(this,
                     "SVG is too large (" + (maxCol + 1) + "×" + (maxRow + 1) + " cells). Max supported: 80×80.");
-                return;
+                return null;
             }
 
-            model.resetGrid(gridSize);
+            Color[][] grid = new Color[gridSize][gridSize];
             for (int[] cell : cells)
-                model.setCellColor(cell[1], cell[0], new Color(cell[2]));
+                grid[cell[1]][cell[0]] = new Color(cell[2]);
+            return grid;
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Load SVG failed: " + ex.getMessage());
+            JOptionPane.showMessageDialog(this, "Load SVG failed (" + file.getName() + "): " + ex.getMessage());
+            return null;
         }
     }
 
@@ -385,7 +562,6 @@ public class ActionPanel extends JPanel implements ChangeListener {
                     g2.dispose();
                 }
             } else {
-                // Try image/* stream flavors
                 for (DataFlavor f : t.getTransferDataFlavors()) {
                     if (f.getMimeType().startsWith("image/")
                             && InputStream.class.isAssignableFrom(f.getRepresentationClass())) {
@@ -395,7 +571,6 @@ public class ActionPanel extends JPanel implements ChangeListener {
                         } catch (Exception ignored) {}
                     }
                 }
-                // GTK image viewers copy a file URI (text/uri-list) rather than image bytes
                 if (bi == null) {
                     DataFlavor uriList = new DataFlavor("text/uri-list;class=java.lang.String");
                     if (t.isDataFlavorSupported(uriList)) {

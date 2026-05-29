@@ -9,7 +9,8 @@ import javax.swing.event.ChangeListener;
 
 public class SpriteModel {
 
-    public enum DrawingTool { PENCIL, LINE }
+    public enum DrawingTool { PENCIL, LINE, DRAG }
+    public enum Mode { DRAW, TRANSFORM }
 
     private int gridSize = 32;
     private final String author = "Briidough";
@@ -21,6 +22,15 @@ public class SpriteModel {
     private BufferedImage bgImage = null;
     private boolean showBgImage = true;
     private String filePath = null;
+    private Mode mode = Mode.DRAW;
+    private List<Color[][]> animationFrames = new ArrayList<>();
+    private int animSpread  = 24;
+    private int animSpeedMs = 300;
+    private int animHoldMs  = 200;
+    private int animEasing  = 0;   // 0=Smooth, 1=Sharp, 2=Snappy
+    private int animFocalX  = 50;  // % of canvas width
+    private int animFocalY  = 50;  // % of canvas height
+    private int animSpin    = 0;   // 0=None, 1=CW, 2=CCW
     private final List<ChangeListener> listeners = new ArrayList<>();
 
     public int getGridSize() { return gridSize; }
@@ -79,6 +89,41 @@ public class SpriteModel {
         showBgImage = true;
         fireChange();
     }
+
+    public Mode getMode() { return mode; }
+    public void setMode(Mode m) { mode = m; fireChange(); }
+
+    public void setGrid(Color[][] newGrid) {
+        int size = newGrid.length;
+        for (int r = 0; r < size; r++)
+            grid[r] = java.util.Arrays.copyOf(newGrid[r], size);
+        fireChange();
+    }
+
+    public Color[][] getGridCopy() {
+        Color[][] copy = new Color[gridSize][gridSize];
+        for (int r = 0; r < gridSize; r++)
+            copy[r] = java.util.Arrays.copyOf(grid[r], gridSize);
+        return copy;
+    }
+
+    public List<Color[][]> getAnimationFrames() { return animationFrames; }
+    public void setAnimationFrames(List<Color[][]> frames) { animationFrames = frames; fireChange(); }
+
+    public int getAnimSpread()   { return animSpread; }
+    public void setAnimSpread(int v)  { animSpread = v; }
+    public int getAnimSpeedMs()  { return animSpeedMs; }
+    public void setAnimSpeedMs(int v) { animSpeedMs = v; }
+    public int getAnimHoldMs()   { return animHoldMs; }
+    public void setAnimHoldMs(int v)  { animHoldMs = v; }
+    public int getAnimEasing()   { return animEasing; }
+    public void setAnimEasing(int v)  { animEasing = v; }
+    public int getAnimFocalX()   { return animFocalX; }
+    public void setAnimFocalX(int v)  { animFocalX = v; }
+    public int getAnimFocalY()   { return animFocalY; }
+    public void setAnimFocalY(int v)  { animFocalY = v; }
+    public int getAnimSpin()     { return animSpin; }
+    public void setAnimSpin(int v)    { animSpin = v; }
 
     public void addChangeListener(ChangeListener l) { listeners.add(l); }
 
