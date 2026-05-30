@@ -11,11 +11,15 @@ import java.util.List;
 public class PreviewPanel extends JPanel implements ChangeListener {
 
     private static final int CELL = 4;
-    private static final String[] EASING_NAMES = {"Smooth", "Sharp", "Snappy"};
 
     private final SpriteModel model;
     private final Canvas canvas;
     private final JPanel animControls;
+    private final JToggleButton btnZoom1x;
+    private final JToggleButton btnZoom2x;
+    private final JToggleButton btnZoom4x;
+
+    private int zoomLevel = 1;
 
     // Animation state
     private boolean animating = false;
@@ -39,7 +43,26 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         setLayout(new BorderLayout());
 
         canvas = new Canvas();
-        add(new JScrollPane(canvas), BorderLayout.CENTER);
+        add(canvas, BorderLayout.CENTER);
+
+        // Zoom controls — always visible, enabled state depends on grid size
+        btnZoom1x = new JToggleButton("1x");
+        btnZoom2x = new JToggleButton("2x");
+        btnZoom4x = new JToggleButton("4x");
+        btnZoom1x.setSelected(true);
+        ButtonGroup zoomGroup = new ButtonGroup();
+        zoomGroup.add(btnZoom1x);
+        zoomGroup.add(btnZoom2x);
+        zoomGroup.add(btnZoom4x);
+
+        btnZoom1x.addActionListener(e -> { zoomLevel = 1; canvas.repaint(); });
+        btnZoom2x.addActionListener(e -> { zoomLevel = 2; canvas.repaint(); });
+        btnZoom4x.addActionListener(e -> { zoomLevel = 4; canvas.repaint(); });
+
+        JPanel zoomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
+        zoomPanel.add(btnZoom1x);
+        zoomPanel.add(btnZoom2x);
+        zoomPanel.add(btnZoom4x);
 
         // Animation controls (TRANSFORM mode only)
         animControls = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
@@ -52,7 +75,12 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         animControls.add(btnStep);
         animControls.add(btnReset);
         animControls.setVisible(false);
-        add(animControls, BorderLayout.SOUTH);
+
+        JPanel southPanel = new JPanel();
+        southPanel.setLayout(new BoxLayout(southPanel, BoxLayout.Y_AXIS));
+        southPanel.add(zoomPanel);
+        southPanel.add(animControls);
+        add(southPanel, BorderLayout.SOUTH);
 
         burstTimer = new javax.swing.Timer(16, e -> tickBurst());
         pauseTimer = new javax.swing.Timer(200, null);
@@ -91,12 +119,39 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             pauseTimer.stop();
         } else {
             List<Color[][]> frames = model.getAnimationFrames();
+            if (frames.isEmpty()) {
+                playing = false;
+                animating = false;
+                burstTimer.stop();
+                pauseTimer.stop();
+            }
             if (currentFrameIdx >= frames.size()) currentFrameIdx = 0;
             if (!animating) canvas.repaint();
         }
-        int px = model.getGridSize() * CELL;
-        canvas.setPreferredSize(new Dimension(px, px));
-        canvas.revalidate();
+
+        int gridSize = model.getGridSize();
+        if (gridSize == 16) {
+            btnZoom1x.setEnabled(true);
+            btnZoom2x.setEnabled(true);
+            btnZoom4x.setEnabled(true);
+        } else if (gridSize == 32) {
+            btnZoom1x.setEnabled(true);
+            btnZoom2x.setEnabled(true);
+            btnZoom4x.setEnabled(false);
+            if (zoomLevel > 2) {
+                zoomLevel = 2;
+                btnZoom2x.setSelected(true);
+            }
+        } else {
+            btnZoom1x.setEnabled(true);
+            btnZoom2x.setEnabled(false);
+            btnZoom4x.setEnabled(false);
+            if (zoomLevel > 1) {
+                zoomLevel = 1;
+                btnZoom1x.setSelected(true);
+            }
+        }
+
         canvas.repaint();
     }
 
@@ -132,6 +187,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     }
 
     private int[][] buildPixels(Color[][] frame, int size) {
+        int cellSize = CELL * zoomLevel;
         int count = 0;
         for (int r = 0; r < size; r++)
             for (int c = 0; c < size; c++)
@@ -141,8 +197,8 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         for (int r = 0; r < size; r++)
             for (int c = 0; c < size; c++)
                 if (frame[r][c] != null) {
-                    pixels[i][0] = c * CELL;
-                    pixels[i][1] = r * CELL;
+                    pixels[i][0] = c * cellSize;
+                    pixels[i][1] = r * cellSize;
                     pixels[i][2] = frame[r][c].getRGB();
                     i++;
                 }
@@ -150,27 +206,36 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     }
 
     private float[][] buildDirs(int[][] pixels, int gridSize) {
-        float totalPx = gridSize * CELL;
+        int cellSize = CELL * zoomLevel;
+        float totalPx = gridSize * cellSize;
         float cx = totalPx * model.getAnimFocalX() / 100f;
         float cy = totalPx * model.getAnimFocalY() / 100f;
         int spin = model.getAnimSpin();
+        float t = model.getAnimSpinStrength() / 100f + 0.5f;
         float[][] dirs = new float[pixels.length][2];
         for (int i = 0; i < pixels.length; i++) {
-            float dx = pixels[i][0] + CELL / 2f - cx;
-            float dy = pixels[i][1] + CELL / 2f - cy;
+            float dx = pixels[i][0] + cellSize / 2f - cx;
+            float dy = pixels[i][1] + cellSize / 2f - cy;
             float len = (float) Math.hypot(dx, dy);
             if (len < 0.001f) len = 0.001f;
             float nx = dx / len, ny = dy / len;
-            if (spin == 1) {           // clockwise: rotate 90° CW
-                dirs[i][0] =  ny;
-                dirs[i][1] = -nx;
-            } else if (spin == 2) {    // counter-clockwise: rotate 90° CCW
-                dirs[i][0] = -ny;
-                dirs[i][1] =  nx;
-            } else {                   // none: radial
-                dirs[i][0] = nx;
-                dirs[i][1] = ny;
+            float bx, by;
+            if (spin == 1) {
+                // blend radial → CW tangential
+                bx = nx * (1 - t) +  ny * t;
+                by = ny * (1 - t) + -nx * t;
+            } else if (spin == 2) {
+                // blend radial → CCW tangential
+                bx = nx * (1 - t) + -ny * t;
+                by = ny * (1 - t) +  nx * t;
+            } else {
+                bx = nx;
+                by = ny;
             }
+            float blen = (float) Math.hypot(bx, by);
+            if (blen < 0.001f) blen = 0.001f;
+            dirs[i][0] = bx / blen;
+            dirs[i][1] = by / blen;
         }
         return dirs;
     }
@@ -192,34 +257,43 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     }
 
     private void paintBurstPixels(Graphics g, int[][] pixels, float[][] dirs, float offset) {
+        int cellSize = CELL * zoomLevel;
         for (int i = 0; i < pixels.length; i++) {
             g.setColor(new Color(pixels[i][2]));
             g.fillRect(
                 (int)(pixels[i][0] + dirs[i][0] * offset),
                 (int)(pixels[i][1] + dirs[i][1] * offset),
-                CELL, CELL);
+                cellSize, cellSize);
         }
     }
 
     // ── canvas ───────────────────────────────────────────────────────────────
 
     private class Canvas extends JPanel {
-        Canvas() {
-            int px = model.getGridSize() * CELL;
-            setPreferredSize(new Dimension(px, px));
-        }
 
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
+            int cellSize = CELL * zoomLevel;
+            int size = model.getGridSize();
+            int spriteW = size * cellSize;
+            int spriteH = size * cellSize;
+            int offsetX = Math.max(0, (getWidth() - spriteW) / 2);
+            int offsetY = (int)(getHeight() * 0.05f);
+
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.translate(offsetX, offsetY);
+
             if (model.getMode() == Mode.TRANSFORM) {
-                paintTransform(g);
+                paintTransform(g2, cellSize);
             } else {
-                paintDraw(g);
+                paintDraw(g2, cellSize);
             }
+
+            g2.dispose();
         }
 
-        private void paintTransform(Graphics g) {
+        private void paintTransform(Graphics2D g, int cellSize) {
             List<Color[][]> frames = model.getAnimationFrames();
             if (frames.isEmpty()) {
                 g.setColor(RetroTheme.noFramesTextColor());
@@ -245,30 +319,31 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                         Color c = frame[row][col];
                         if (c != null) {
                             g.setColor(c);
-                            g.fillRect(col * CELL, row * CELL, CELL, CELL);
+                            g.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
                         }
                     }
             }
         }
 
-        private void paintDraw(Graphics g) {
+        private void paintDraw(Graphics2D g, int cellSize) {
             int size = model.getGridSize();
             for (int row = 0; row < size; row++) {
                 for (int col = 0; col < size; col++) {
                     Color c = model.getCellColor(row, col);
-                    int x = col * CELL, y = row * CELL;
+                    int x = col * cellSize, y = row * cellSize;
                     if (c == null) {
-                        drawCheckerboard(g, x, y);
+                        drawCheckerboard(g, x, y, cellSize);
                     } else {
                         g.setColor(c);
-                        g.fillRect(x, y, CELL, CELL);
+                        g.fillRect(x, y, cellSize, cellSize);
                     }
                 }
             }
         }
 
-        private void drawCheckerboard(Graphics g, int x, int y) {
-            int half = CELL / 2;
+        private void drawCheckerboard(Graphics g, int x, int y, int cellSize) {
+            int half = cellSize / 2;
+            if (half < 1) half = 1;
             g.setColor(RetroTheme.checkA());
             g.fillRect(x, y, half, half);
             g.fillRect(x + half, y + half, half, half);

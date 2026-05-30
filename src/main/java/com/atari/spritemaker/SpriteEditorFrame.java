@@ -69,7 +69,11 @@ public class SpriteEditorFrame extends JFrame {
             editorPanel, previewPanel);
         split.setResizeWeight(0.7);
 
-        add(actionPanel, BorderLayout.WEST);
+        JScrollPane actionScroll = new JScrollPane(actionPanel,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        actionScroll.setBorder(null);
+        add(actionScroll, BorderLayout.WEST);
         add(split, BorderLayout.CENTER);
 
         pack();

@@ -31,6 +31,7 @@ public class SpriteModel {
     private int animFocalX  = 50;  // % of canvas width
     private int animFocalY  = 50;  // % of canvas height
     private int animSpin    = 0;   // 0=None, 1=CW, 2=CCW
+    private int animSpinStrength = 100; // 0=radial, 100=tangential
     private final List<ChangeListener> listeners = new ArrayList<>();
 
     public int getGridSize() { return gridSize; }
@@ -80,6 +81,7 @@ public class SpriteModel {
     public void resetGrid(int newSize) {
         gridSize = newSize;
         grid = new Color[newSize][newSize];
+        animationFrames = new ArrayList<>();
         for (int i = 0; i < 5; i++) palette[i] = null;
         palette[0] = Color.BLACK;
         selectedPaletteSlot = 0;
@@ -124,6 +126,8 @@ public class SpriteModel {
     public void setAnimFocalY(int v)  { animFocalY = v; }
     public int getAnimSpin()     { return animSpin; }
     public void setAnimSpin(int v)    { animSpin = v; }
+    public int getAnimSpinStrength()  { return animSpinStrength; }
+    public void setAnimSpinStrength(int v) { animSpinStrength = v; }
 
     public void addChangeListener(ChangeListener l) { listeners.add(l); }
 

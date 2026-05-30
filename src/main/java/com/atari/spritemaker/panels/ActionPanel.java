@@ -29,12 +29,12 @@ public class ActionPanel extends JPanel implements ChangeListener {
     private JButton transformBtn;
     private JPanel drawModeControls;
     private JPanel transformModeControls;
-    private JSlider sliderSpread, sliderSpeed, sliderHold, sliderFocalX, sliderFocalY;
+    private JSlider sliderSpread, sliderSpeed, sliderHold, sliderFocalX, sliderFocalY, sliderSpinStrength;
     private JComboBox<String> comboEasing, comboSpin;
     private java.io.File lastDir = null;
 
     private static final int DEF_SPREAD = 24, DEF_SPEED = 300, DEF_HOLD = 200;
-    private static final int DEF_EASING = 0,  DEF_FOCAL_X = 50, DEF_FOCAL_Y = 50, DEF_SPIN = 0;
+    private static final int DEF_EASING = 0,  DEF_FOCAL_X = 50, DEF_FOCAL_Y = 50, DEF_SPIN = 0, DEF_SPIN_STRENGTH = 100;
 
     public ActionPanel(SpriteModel model) {
         this.model = model;
@@ -152,8 +152,24 @@ public class ActionPanel extends JPanel implements ChangeListener {
         comboSpin.setSelectedIndex(model.getAnimSpin());
         comboSpin.setAlignmentX(Component.LEFT_ALIGNMENT);
         comboSpin.setMaximumSize(new Dimension(Integer.MAX_VALUE, comboSpin.getPreferredSize().height));
-        comboSpin.addActionListener(e -> model.setAnimSpin(comboSpin.getSelectedIndex()));
         transformModeControls.add(comboSpin);
+
+        sliderSpinStrength = new JSlider(0, 100, model.getAnimSpinStrength());
+        sliderSpinStrength.addChangeListener(e -> model.setAnimSpinStrength(sliderSpinStrength.getValue()));
+        JPanel spinStrengthSection = new JPanel();
+        spinStrengthSection.setLayout(new BoxLayout(spinStrengthSection, BoxLayout.Y_AXIS));
+        spinStrengthSection.setAlignmentX(Component.LEFT_ALIGNMENT);
+        spinStrengthSection.add(Box.createVerticalStrut(6));
+        spinStrengthSection.add(wrapSlider("Spin Strength", sliderSpinStrength));
+        spinStrengthSection.setVisible(model.getAnimSpin() != 0);
+        transformModeControls.add(spinStrengthSection);
+
+        comboSpin.addActionListener(e -> {
+            model.setAnimSpin(comboSpin.getSelectedIndex());
+            spinStrengthSection.setVisible(comboSpin.getSelectedIndex() != 0);
+            transformModeControls.revalidate();
+            transformModeControls.repaint();
+        });
 
         transformModeControls.add(Box.createVerticalStrut(12));
         transformModeControls.add(makeBtn("Reset Defaults", e -> resetAnimDefaults()));
@@ -235,7 +251,8 @@ public class ActionPanel extends JPanel implements ChangeListener {
         model.setAnimEasing(DEF_EASING);   comboEasing.setSelectedIndex(DEF_EASING);
         model.setAnimFocalX(DEF_FOCAL_X);  sliderFocalX.setValue(DEF_FOCAL_X);
         model.setAnimFocalY(DEF_FOCAL_Y);  sliderFocalY.setValue(DEF_FOCAL_Y);
-        model.setAnimSpin(DEF_SPIN);       comboSpin.setSelectedIndex(DEF_SPIN);
+        model.setAnimSpin(DEF_SPIN);             comboSpin.setSelectedIndex(DEF_SPIN);
+        model.setAnimSpinStrength(DEF_SPIN_STRENGTH); sliderSpinStrength.setValue(DEF_SPIN_STRENGTH);
     }
 
     private JButton makeBtn(String label, ActionListener al) {
