@@ -22,7 +22,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
 
     private final SpriteModel model;
     private final JToggleButton btnPencil, btnLine, btnDrag;
-    private final JToggleButton btn32, btn48, btn64, btn80;
+    private final JToggleButton btn16, btn32, btn48, btn64, btn80;
     private JButton btnFillFromImage;
     private JButton btnPasteImage;
     private JToggleButton btnShowBgImage;
@@ -167,22 +167,24 @@ public class ActionPanel extends JPanel implements ChangeListener {
         add(lbl);
         add(Box.createVerticalStrut(4));
 
+        btn16  = new JToggleButton("16");
         btn32  = new JToggleButton("32");
         btn48  = new JToggleButton("48");
         btn64  = new JToggleButton("64");
-        btn80 = new JToggleButton("80");
+        btn80  = new JToggleButton("80");
         btn32.setSelected(true);
 
         ButtonGroup grp = new ButtonGroup();
-        grp.add(btn32); grp.add(btn48); grp.add(btn64); grp.add(btn80);
+        grp.add(btn16); grp.add(btn32); grp.add(btn48); grp.add(btn64); grp.add(btn80);
 
+        btn16 .addActionListener(e -> confirmReset(16));
         btn32 .addActionListener(e -> confirmReset(32));
         btn48 .addActionListener(e -> confirmReset(48));
         btn64 .addActionListener(e -> confirmReset(64));
-        btn80.addActionListener(e -> confirmReset(80));
+        btn80 .addActionListener(e -> confirmReset(80));
 
-        JPanel sizeRow = new JPanel(new GridLayout(1, 4, 2, 0));
-        sizeRow.add(btn32); sizeRow.add(btn48); sizeRow.add(btn64); sizeRow.add(btn80);
+        JPanel sizeRow = new JPanel(new GridLayout(1, 5, 2, 0));
+        sizeRow.add(btn16); sizeRow.add(btn32); sizeRow.add(btn48); sizeRow.add(btn64); sizeRow.add(btn80);
         sizeRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         sizeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, sizeRow.getPreferredSize().height));
         add(sizeRow);
@@ -191,10 +193,11 @@ public class ActionPanel extends JPanel implements ChangeListener {
     @Override
     public void stateChanged(ChangeEvent e) {
         int size = model.getGridSize();
+        btn16 .setSelected(size == 16);
         btn32 .setSelected(size == 32);
         btn48 .setSelected(size == 48);
         btn64 .setSelected(size == 64);
-        btn80.setSelected(size == 80);
+        btn80 .setSelected(size == 80);
         btnPencil.setSelected(model.getDrawingTool() == DrawingTool.PENCIL);
         btnLine  .setSelected(model.getDrawingTool() == DrawingTool.LINE);
         btnDrag  .setSelected(model.getDrawingTool() == DrawingTool.DRAG);
@@ -269,10 +272,11 @@ public class ActionPanel extends JPanel implements ChangeListener {
             model.resetGrid(newSize);
         } else {
             int cur = model.getGridSize();
+            btn16 .setSelected(cur == 16);
             btn32 .setSelected(cur == 32);
             btn48 .setSelected(cur == 48);
             btn64 .setSelected(cur == 64);
-            btn80.setSelected(cur == 80);
+            btn80 .setSelected(cur == 80);
         }
     }
 
@@ -472,12 +476,12 @@ public class ActionPanel extends JPanel implements ChangeListener {
             }
 
             int gridSize = -1;
-            for (int s : new int[]{ 32, 48, 64, 80 }) {
+            for (int s : new int[]{ 16, 32, 48, 64, 80 }) {
                 if (maxCol < s && maxRow < s) { gridSize = s; break; }
             }
             if (gridSize == -1) {
                 JOptionPane.showMessageDialog(this,
-                    "SVG is too large (" + (maxCol + 1) + "×" + (maxRow + 1) + " cells). Max supported: 80×80.");
+                    "SVG is too large (" + (maxCol + 1) + "×" + (maxRow + 1) + " cells). Max supported: 80×80. Min: 16×16.");
                 return null;
             }
 
