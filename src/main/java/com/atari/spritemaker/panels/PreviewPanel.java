@@ -6,6 +6,7 @@ import com.atari.spritemaker.ui.RetroTheme;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.List;
 
 public class PreviewPanel extends JPanel implements ChangeListener {
@@ -30,9 +31,15 @@ public class PreviewPanel extends JPanel implements ChangeListener {
 
     // Per-transition pixel data
     private int[][] fromPixels;
+    private Color[] fromColors;
     private float[][] fromDirs;
     private int[][] toPixels;
+    private Color[] toColors;
     private float[][] toDirs;
+
+    // Draw mode cache
+    private BufferedImage drawCache;
+    private boolean drawDirty = true;
 
     // Timers
     private final javax.swing.Timer burstTimer;
@@ -55,9 +62,9 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         zoomGroup.add(btnZoom2x);
         zoomGroup.add(btnZoom4x);
 
-        btnZoom1x.addActionListener(e -> { zoomLevel = 1; canvas.repaint(); });
-        btnZoom2x.addActionListener(e -> { zoomLevel = 2; canvas.repaint(); });
-        btnZoom4x.addActionListener(e -> { zoomLevel = 4; canvas.repaint(); });
+        btnZoom1x.addActionListener(e -> { zoomLevel = 1; drawDirty = true; canvas.repaint(); });
+        btnZoom2x.addActionListener(e -> { zoomLevel = 2; drawDirty = true; canvas.repaint(); });
+        btnZoom4x.addActionListener(e -> { zoomLevel = 4; drawDirty = true; canvas.repaint(); });
 
         JPanel zoomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
         zoomPanel.add(btnZoom1x);
@@ -152,6 +159,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             }
         }
 
+        drawDirty = true;
         canvas.repaint();
     }
 
@@ -163,8 +171,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         nextFrameIdx = frames.size() < 2 ? currentFrameIdx : (currentFrameIdx + 1) % frames.size();
         int gridSize = frames.get(currentFrameIdx).length;
         fromPixels = buildPixels(frames.get(currentFrameIdx), gridSize);
+        fromColors = buildColors(fromPixels);
         fromDirs   = buildDirs(fromPixels, gridSize);
         toPixels   = buildPixels(frames.get(nextFrameIdx), gridSize);
+        toColors   = buildColors(toPixels);
         toDirs     = buildDirs(toPixels, gridSize);
         animProgress = 0f;
         animating = true;
@@ -240,6 +250,13 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         return dirs;
     }
 
+    private Color[] buildColors(int[][] pixels) {
+        Color[] colors = new Color[pixels.length];
+        for (int i = 0; i < pixels.length; i++)
+            colors[i] = new Color(pixels[i][2]);
+        return colors;
+    }
+
     private float easingOut(float t, int style) {
         switch (style) {
             case 1: return t;
@@ -256,10 +273,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         }
     }
 
-    private void paintBurstPixels(Graphics g, int[][] pixels, float[][] dirs, float offset) {
+    private void paintBurstPixels(Graphics g, int[][] pixels, Color[] colors, float[][] dirs, float offset) {
         int cellSize = CELL * zoomLevel;
         for (int i = 0; i < pixels.length; i++) {
-            g.setColor(new Color(pixels[i][2]));
+            g.setColor(colors[i]);
             g.fillRect(
                 (int)(pixels[i][0] + dirs[i][0] * offset),
                 (int)(pixels[i][1] + dirs[i][1] * offset),
@@ -306,10 +323,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 int easing = model.getAnimEasing();
                 if (animProgress < 0.5f) {
                     float t = animProgress / 0.5f;
-                    paintBurstPixels(g, fromPixels, fromDirs, spread * easingOut(t, easing));
+                    paintBurstPixels(g, fromPixels, fromColors, fromDirs, spread * easingOut(t, easing));
                 } else {
                     float t = (animProgress - 0.5f) / 0.5f;
-                    paintBurstPixels(g, toPixels, toDirs, spread * (1f - easingIn(t, easing)));
+                    paintBurstPixels(g, toPixels, toColors, toDirs, spread * (1f - easingIn(t, easing)));
                 }
             } else {
                 Color[][] frame = frames.get(currentFrameIdx);
@@ -327,18 +344,23 @@ public class PreviewPanel extends JPanel implements ChangeListener {
 
         private void paintDraw(Graphics2D g, int cellSize) {
             int size = model.getGridSize();
-            for (int row = 0; row < size; row++) {
-                for (int col = 0; col < size; col++) {
-                    Color c = model.getCellColor(row, col);
-                    int x = col * cellSize, y = row * cellSize;
-                    if (c == null) {
-                        drawCheckerboard(g, x, y, cellSize);
-                    } else {
-                        g.setColor(c);
-                        g.fillRect(x, y, cellSize, cellSize);
+            int w = size * cellSize, h = size * cellSize;
+            if (drawDirty || drawCache == null
+                    || drawCache.getWidth() != w || drawCache.getHeight() != h) {
+                drawCache = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D bg = drawCache.createGraphics();
+                for (int row = 0; row < size; row++) {
+                    for (int col = 0; col < size; col++) {
+                        Color c = model.getCellColor(row, col);
+                        int x = col * cellSize, y = row * cellSize;
+                        if (c == null) drawCheckerboard(bg, x, y, cellSize);
+                        else { bg.setColor(c); bg.fillRect(x, y, cellSize, cellSize); }
                     }
                 }
+                bg.dispose();
+                drawDirty = false;
             }
+            g.drawImage(drawCache, 0, 0, null);
         }
 
         private void drawCheckerboard(Graphics g, int x, int y, int cellSize) {
