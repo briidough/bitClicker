@@ -25,13 +25,14 @@ public class SpriteModel {
     private Mode mode = Mode.DRAW;
     private List<Color[][]> animationFrames = new ArrayList<>();
     private int animSpread  = 24;
-    private int animSpeedMs = 300;
+    private int animSpeedMs = 500;
     private int animHoldMs  = 200;
     private int animEasing  = 0;   // 0=Smooth, 1=Sharp, 2=Snappy
     private int animFocalX  = 50;  // % of canvas width
     private int animFocalY  = 50;  // % of canvas height
     private int animSpin    = 0;   // 0=None, 1=CW, 2=CCW
     private int animSpinStrength = 100; // 0=radial, 100=tangential
+    private boolean focalActive = false;
     private final List<ChangeListener> listeners = new ArrayList<>();
 
     public int getGridSize() { return gridSize; }
@@ -121,13 +122,15 @@ public class SpriteModel {
     public int getAnimEasing()   { return animEasing; }
     public void setAnimEasing(int v)  { animEasing = v; }
     public int getAnimFocalX()   { return animFocalX; }
-    public void setAnimFocalX(int v)  { animFocalX = v; }
+    public void setAnimFocalX(int v)  { animFocalX = v; fireChange(); }
     public int getAnimFocalY()   { return animFocalY; }
-    public void setAnimFocalY(int v)  { animFocalY = v; }
+    public void setAnimFocalY(int v)  { animFocalY = v; fireChange(); }
     public int getAnimSpin()     { return animSpin; }
     public void setAnimSpin(int v)    { animSpin = v; }
     public int getAnimSpinStrength()  { return animSpinStrength; }
     public void setAnimSpinStrength(int v) { animSpinStrength = v; }
+    public boolean isFocalActive()    { return focalActive; }
+    public void setFocalActive(boolean v) { focalActive = v; fireChange(); }
 
     public void addChangeListener(ChangeListener l) { listeners.add(l); }
 

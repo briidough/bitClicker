@@ -366,10 +366,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         private void drawCheckerboard(Graphics g, int x, int y, int cellSize) {
             int half = cellSize / 2;
             if (half < 1) half = 1;
-            g.setColor(RetroTheme.checkA());
+            g.setColor(new Color(0xcccccc));
             g.fillRect(x, y, half, half);
             g.fillRect(x + half, y + half, half, half);
-            g.setColor(RetroTheme.checkB());
+            g.setColor(Color.WHITE);
             g.fillRect(x + half, y, half, half);
             g.fillRect(x, y + half, half, half);
         }

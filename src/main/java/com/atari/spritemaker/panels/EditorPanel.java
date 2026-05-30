@@ -196,7 +196,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
                         g2.setColor(c);
                         g2.fillRect(x, y, CELL, CELL);
                     }
-                    g2.setColor(RetroTheme.gridLine());
+                    g2.setColor(Color.LIGHT_GRAY);
                     g2.drawRect(x, y, CELL, CELL);
                 }
             }
@@ -209,14 +209,35 @@ public class EditorPanel extends JPanel implements ChangeListener {
                 g2.drawRect(x, y, CELL - 1, CELL - 1);
                 g2.drawRect(x + 1, y + 1, CELL - 3, CELL - 3);
             }
+
+            if (model.getMode() == Mode.TRANSFORM) {
+                drawFocalCross(g2, size);
+            }
+        }
+
+        private void drawFocalCross(Graphics2D g, int gridSize) {
+            int arm = model.isFocalActive() ? CELL * 2 : CELL;
+            int cx = Math.round(gridSize * CELL * model.getAnimFocalX() / 100f);
+            int cy = Math.round(gridSize * CELL * model.getAnimFocalY() / 100f);
+
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setStroke(new BasicStroke(2f));
+            g2.setColor(Color.BLACK);
+            g2.drawLine(cx - arm, cy + 1, cx + arm, cy + 1);
+            g2.drawLine(cx + 1, cy - arm, cx + 1, cy + arm);
+            g2.setColor(Color.WHITE);
+            g2.drawLine(cx - arm, cy, cx + arm, cy);
+            g2.drawLine(cx, cy - arm, cx, cy + arm);
+            g2.dispose();
         }
 
         private void drawCheckerboard(Graphics g, int x, int y) {
             int half = CELL / 2;
-            g.setColor(RetroTheme.checkA());
+            g.setColor(new Color(0xcccccc));
             g.fillRect(x, y, half, half);
             g.fillRect(x + half, y + half, half, half);
-            g.setColor(RetroTheme.checkB());
+            g.setColor(Color.WHITE);
             g.fillRect(x + half, y, half, half);
             g.fillRect(x, y + half, half, half);
         }

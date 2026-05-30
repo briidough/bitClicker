@@ -137,10 +137,18 @@ public class ActionPanel extends JPanel implements ChangeListener {
         transformModeControls.add(Box.createVerticalStrut(4));
         sliderFocalX = new JSlider(0, 100, model.getAnimFocalX());
         sliderFocalX.addChangeListener(e -> model.setAnimFocalX(sliderFocalX.getValue()));
+        sliderFocalX.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e)  { model.setFocalActive(true); }
+            public void mouseReleased(MouseEvent e) { model.setFocalActive(false); }
+        });
         transformModeControls.add(wrapSlider("X %", sliderFocalX));
         transformModeControls.add(Box.createVerticalStrut(4));
         sliderFocalY = new JSlider(0, 100, model.getAnimFocalY());
         sliderFocalY.addChangeListener(e -> model.setAnimFocalY(sliderFocalY.getValue()));
+        sliderFocalY.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e)  { model.setFocalActive(true); }
+            public void mouseReleased(MouseEvent e) { model.setFocalActive(false); }
+        });
         transformModeControls.add(wrapSlider("Y %", sliderFocalY));
 
         transformModeControls.add(Box.createVerticalStrut(8));
