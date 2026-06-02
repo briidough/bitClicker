@@ -60,6 +60,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
     }
 
     private class GridCanvas extends JPanel {
+        private static final BasicStroke STROKE_CROSS = new BasicStroke(2f);
         private int lineStartRow = -1, lineStartCol = -1;
         private int dragStartRow = -1, dragStartCol = -1;
         private Color[][] dragSnapshot = null;
@@ -222,7 +223,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
 
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setStroke(new BasicStroke(2f));
+            g2.setStroke(STROKE_CROSS);
             g2.setColor(Color.BLACK);
             g2.drawLine(cx - arm, cy + 1, cx + arm, cy + 1);
             g2.drawLine(cx + 1, cy - arm, cx + 1, cy + arm);

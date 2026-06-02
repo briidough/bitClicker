@@ -32,6 +32,17 @@ public class SpriteModel {
     private int animFocalY  = 50;  // % of canvas height
     private int animSpin    = 0;   // 0=None, 1=CW, 2=CCW
     private int animSpinStrength = 100; // 0=radial, 100=tangential
+    private int animEffectType    = 0;    // 0=PixelBurst, 1=PixelPop
+    private int animGravityPush   = 50;
+    private int animGravityPull   = 50;
+    private int animGravityFocalX = 50;
+    private int animGravityFocalY = 100;
+    private int animExplodeSpeedMs    = 1000;
+    private int animUnsplodeSpeedMs   = 1000;
+    private int animExplodeStrength   = 100; // 50–150 (% multiplier on push energy)
+    private int animUnsplodeStrength  = 95;  // 85–99 (snap threshold %)
+    private boolean animStayInCanvas  = false;
+    private int animPopHoldMs = 0;
     private boolean focalActive = false;
     private final List<ChangeListener> listeners = new ArrayList<>();
 
@@ -122,15 +133,37 @@ public class SpriteModel {
     public int getAnimEasing()   { return animEasing; }
     public void setAnimEasing(int v)  { animEasing = v; }
     public int getAnimFocalX()   { return animFocalX; }
-    public void setAnimFocalX(int v)  { animFocalX = v; fireChange(); }
+    public void setAnimFocalX(int v)  { if (animFocalX == v) return; animFocalX = v; fireChange(); }
     public int getAnimFocalY()   { return animFocalY; }
-    public void setAnimFocalY(int v)  { animFocalY = v; fireChange(); }
+    public void setAnimFocalY(int v)  { if (animFocalY == v) return; animFocalY = v; fireChange(); }
     public int getAnimSpin()     { return animSpin; }
     public void setAnimSpin(int v)    { animSpin = v; }
     public int getAnimSpinStrength()  { return animSpinStrength; }
     public void setAnimSpinStrength(int v) { animSpinStrength = v; }
+    public int getAnimEffectType()        { return animEffectType; }
+    public void setAnimEffectType(int v)  { animEffectType = v; }
+    public int getAnimGravityPush()       { return animGravityPush; }
+    public void setAnimGravityPush(int v) { animGravityPush = v; }
+    public int getAnimGravityPull()       { return animGravityPull; }
+    public void setAnimGravityPull(int v) { animGravityPull = v; }
+    public int getAnimGravityFocalX()        { return animGravityFocalX; }
+    public void setAnimGravityFocalX(int v)  { if (animGravityFocalX == v) return; animGravityFocalX = v; fireChange(); }
+    public int getAnimGravityFocalY()        { return animGravityFocalY; }
+    public void setAnimGravityFocalY(int v)  { if (animGravityFocalY == v) return; animGravityFocalY = v; fireChange(); }
+    public int getAnimExplodeSpeedMs()           { return animExplodeSpeedMs; }
+    public void setAnimExplodeSpeedMs(int v)     { animExplodeSpeedMs = v; }
+    public int getAnimUnsplodeSpeedMs()          { return animUnsplodeSpeedMs; }
+    public void setAnimUnsplodeSpeedMs(int v)    { animUnsplodeSpeedMs = v; }
+    public int getAnimExplodeStrength()          { return animExplodeStrength; }
+    public void setAnimExplodeStrength(int v)    { animExplodeStrength = v; }
+    public int getAnimUnsplodeStrength()         { return animUnsplodeStrength; }
+    public void setAnimUnsplodeStrength(int v)   { animUnsplodeStrength = v; }
+    public boolean isAnimStayInCanvas()          { return animStayInCanvas; }
+    public void setAnimStayInCanvas(boolean v)   { animStayInCanvas = v; }
+    public int getAnimPopHoldMs()                { return animPopHoldMs; }
+    public void setAnimPopHoldMs(int v)          { animPopHoldMs = v; }
     public boolean isFocalActive()    { return focalActive; }
-    public void setFocalActive(boolean v) { focalActive = v; fireChange(); }
+    public void setFocalActive(boolean v) { if (focalActive == v) return; focalActive = v; fireChange(); }
 
     public void addChangeListener(ChangeListener l) { listeners.add(l); }
 

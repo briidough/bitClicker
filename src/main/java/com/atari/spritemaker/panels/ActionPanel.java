@@ -29,12 +29,27 @@ public class ActionPanel extends JPanel implements ChangeListener {
     private JButton transformBtn;
     private JPanel drawModeControls;
     private JPanel transformModeControls;
+
+    // Pixel Burst controls
     private JSlider sliderSpread, sliderSpeed, sliderHold, sliderFocalX, sliderFocalY, sliderSpinStrength;
     private JComboBox<String> comboEasing, comboSpin;
+
+    // Pixel Pop controls
+    private JButton btnBurstTab, btnPopTab;
+    private JPanel tabContent;
+    private JSlider sliderGravPush, sliderGravPull, sliderGravFocalX, sliderGravFocalY;
+    private JSlider sliderExplodeSpeed, sliderUnsplodeSpeed;
+    private JSlider sliderExplodeStrength, sliderUnsplodeStrength;
+    private JSlider sliderPopHold;
+
     private java.io.File lastDir = null;
 
     private static final int DEF_SPREAD = 24, DEF_SPEED = 300, DEF_HOLD = 200;
-    private static final int DEF_EASING = 0,  DEF_FOCAL_X = 50, DEF_FOCAL_Y = 50, DEF_SPIN = 0, DEF_SPIN_STRENGTH = 100;
+    private static final int DEF_EASING = 0, DEF_FOCAL_X = 50, DEF_FOCAL_Y = 50, DEF_SPIN = 0, DEF_SPIN_STRENGTH = 100;
+    private static final int DEF_GRAV_PUSH = 50, DEF_GRAV_PULL = 50, DEF_GRAV_FOCAL_X = 50, DEF_GRAV_FOCAL_Y = 100;
+    private static final int DEF_EXPLODE_SPEED = 1000, DEF_UNSPLODE_SPEED = 1000;
+    private static final int DEF_EXPLODE_STRENGTH = 100, DEF_UNSPLODE_STRENGTH = 95;
+    private static final int DEF_POP_HOLD = 0;
 
     public ActionPanel(SpriteModel model) {
         this.model = model;
@@ -102,65 +117,80 @@ public class ActionPanel extends JPanel implements ChangeListener {
         transformModeControls.add(Box.createVerticalStrut(4));
         transformModeControls.add(makeBtn("Load Animation Frames", e -> loadAnimationFrames()));
 
-        transformModeControls.add(Box.createVerticalStrut(12));
+        // Tab buttons: Pixel Burst | Pixel Pop
+        transformModeControls.add(Box.createVerticalStrut(8));
+        btnBurstTab = new JButton("Pixel Burst");
+        btnPopTab   = new JButton("Pixel Pop");
+        btnBurstTab.setEnabled(false); // active by default → greyed
+        JPanel tabRow = new JPanel(new GridLayout(1, 2, 2, 0));
+        tabRow.add(btnBurstTab);
+        tabRow.add(btnPopTab);
+        tabRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tabRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, tabRow.getPreferredSize().height));
+        transformModeControls.add(tabRow);
+
+        transformModeControls.add(Box.createVerticalStrut(6));
+
+        // ── Pixel Burst content panel ────────────────────────────────────────
+        JPanel burstContentPanel = new JPanel();
+        burstContentPanel.setLayout(new BoxLayout(burstContentPanel, BoxLayout.Y_AXIS));
+        burstContentPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         sliderSpread = new JSlider(5, 80, model.getAnimSpread());
         sliderSpread.addChangeListener(e -> model.setAnimSpread(sliderSpread.getValue()));
-        transformModeControls.add(wrapSlider("Spread", sliderSpread));
+        burstContentPanel.add(wrapSlider("Spread", sliderSpread));
 
-        transformModeControls.add(Box.createVerticalStrut(6));
+        burstContentPanel.add(Box.createVerticalStrut(6));
         sliderSpeed = new JSlider(100, 1500, model.getAnimSpeedMs());
         sliderSpeed.addChangeListener(e -> model.setAnimSpeedMs(sliderSpeed.getValue()));
-        transformModeControls.add(wrapSlider("Speed (ms)", sliderSpeed));
+        burstContentPanel.add(wrapSlider("Speed (ms)", sliderSpeed));
 
-        transformModeControls.add(Box.createVerticalStrut(6));
+        burstContentPanel.add(Box.createVerticalStrut(6));
         sliderHold = new JSlider(0, 2000, model.getAnimHoldMs());
         sliderHold.addChangeListener(e -> model.setAnimHoldMs(sliderHold.getValue()));
-        transformModeControls.add(wrapSlider("Hold (ms)", sliderHold));
+        burstContentPanel.add(wrapSlider("Hold (ms)", sliderHold));
 
-        transformModeControls.add(Box.createVerticalStrut(8));
+        burstContentPanel.add(Box.createVerticalStrut(8));
         JLabel easingLbl = new JLabel("Easing:");
         easingLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        transformModeControls.add(easingLbl);
-        transformModeControls.add(Box.createVerticalStrut(2));
+        burstContentPanel.add(easingLbl);
+        burstContentPanel.add(Box.createVerticalStrut(2));
         comboEasing = new JComboBox<>(new String[]{"Smooth", "Sharp", "Snappy"});
         comboEasing.setSelectedIndex(model.getAnimEasing());
         comboEasing.setAlignmentX(Component.LEFT_ALIGNMENT);
         comboEasing.setMaximumSize(new Dimension(Integer.MAX_VALUE, comboEasing.getPreferredSize().height));
         comboEasing.addActionListener(e -> model.setAnimEasing(comboEasing.getSelectedIndex()));
-        transformModeControls.add(comboEasing);
+        burstContentPanel.add(comboEasing);
 
-        transformModeControls.add(Box.createVerticalStrut(12));
+        burstContentPanel.add(Box.createVerticalStrut(12));
         JLabel focalLbl = new JLabel("Focal Point:");
         focalLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        transformModeControls.add(focalLbl);
-        transformModeControls.add(Box.createVerticalStrut(4));
+        burstContentPanel.add(focalLbl);
+        burstContentPanel.add(Box.createVerticalStrut(4));
         sliderFocalX = new JSlider(0, 100, model.getAnimFocalX());
         sliderFocalX.addChangeListener(e -> model.setAnimFocalX(sliderFocalX.getValue()));
-        sliderFocalX.addMouseListener(new MouseAdapter() {
+        MouseAdapter focalDragTracker = new MouseAdapter() {
             public void mousePressed(MouseEvent e)  { model.setFocalActive(true); }
             public void mouseReleased(MouseEvent e) { model.setFocalActive(false); }
-        });
-        transformModeControls.add(wrapSlider("X %", sliderFocalX));
-        transformModeControls.add(Box.createVerticalStrut(4));
+        };
+        sliderFocalX.addMouseListener(focalDragTracker);
+        burstContentPanel.add(wrapSlider("X %", sliderFocalX));
+        burstContentPanel.add(Box.createVerticalStrut(4));
         sliderFocalY = new JSlider(0, 100, model.getAnimFocalY());
         sliderFocalY.addChangeListener(e -> model.setAnimFocalY(sliderFocalY.getValue()));
-        sliderFocalY.addMouseListener(new MouseAdapter() {
-            public void mousePressed(MouseEvent e)  { model.setFocalActive(true); }
-            public void mouseReleased(MouseEvent e) { model.setFocalActive(false); }
-        });
-        transformModeControls.add(wrapSlider("Y %", sliderFocalY));
+        sliderFocalY.addMouseListener(focalDragTracker);
+        burstContentPanel.add(wrapSlider("Y %", sliderFocalY));
 
-        transformModeControls.add(Box.createVerticalStrut(8));
+        burstContentPanel.add(Box.createVerticalStrut(8));
         JLabel spinLbl = new JLabel("Spin:");
         spinLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        transformModeControls.add(spinLbl);
-        transformModeControls.add(Box.createVerticalStrut(2));
+        burstContentPanel.add(spinLbl);
+        burstContentPanel.add(Box.createVerticalStrut(2));
         comboSpin = new JComboBox<>(new String[]{"None", "Clockwise", "Counter-clockwise"});
         comboSpin.setSelectedIndex(model.getAnimSpin());
         comboSpin.setAlignmentX(Component.LEFT_ALIGNMENT);
         comboSpin.setMaximumSize(new Dimension(Integer.MAX_VALUE, comboSpin.getPreferredSize().height));
-        transformModeControls.add(comboSpin);
+        burstContentPanel.add(comboSpin);
 
         sliderSpinStrength = new JSlider(0, 100, model.getAnimSpinStrength());
         sliderSpinStrength.addChangeListener(e -> model.setAnimSpinStrength(sliderSpinStrength.getValue()));
@@ -170,17 +200,91 @@ public class ActionPanel extends JPanel implements ChangeListener {
         spinStrengthSection.add(Box.createVerticalStrut(6));
         spinStrengthSection.add(wrapSlider("Spin Strength", sliderSpinStrength));
         spinStrengthSection.setVisible(model.getAnimSpin() != 0);
-        transformModeControls.add(spinStrengthSection);
+        burstContentPanel.add(spinStrengthSection);
 
         comboSpin.addActionListener(e -> {
             model.setAnimSpin(comboSpin.getSelectedIndex());
             spinStrengthSection.setVisible(comboSpin.getSelectedIndex() != 0);
-            transformModeControls.revalidate();
-            transformModeControls.repaint();
+            burstContentPanel.revalidate();
+            burstContentPanel.repaint();
         });
 
-        transformModeControls.add(Box.createVerticalStrut(12));
-        transformModeControls.add(makeBtn("Reset Defaults", e -> resetAnimDefaults()));
+        burstContentPanel.add(Box.createVerticalStrut(12));
+        burstContentPanel.add(makeBtn("Reset Defaults", e -> resetBurstDefaults()));
+
+        // ── Pixel Pop content panel ──────────────────────────────────────────
+        JPanel popContentPanel = new JPanel();
+        popContentPanel.setLayout(new BoxLayout(popContentPanel, BoxLayout.Y_AXIS));
+        popContentPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        sliderExplodeSpeed = new JSlider(500, 2000, model.getAnimExplodeSpeedMs());
+        sliderExplodeSpeed.addChangeListener(e -> model.setAnimExplodeSpeedMs(sliderExplodeSpeed.getValue()));
+        popContentPanel.add(wrapSlider("Explode Speed (ms)", sliderExplodeSpeed));
+
+        popContentPanel.add(Box.createVerticalStrut(6));
+        sliderExplodeStrength = new JSlider(50, 150, model.getAnimExplodeStrength());
+        sliderExplodeStrength.addChangeListener(e -> model.setAnimExplodeStrength(sliderExplodeStrength.getValue()));
+        popContentPanel.add(wrapSlider("Explode Strength", sliderExplodeStrength));
+
+        popContentPanel.add(Box.createVerticalStrut(6));
+        sliderUnsplodeSpeed = new JSlider(500, 2000, model.getAnimUnsplodeSpeedMs());
+        sliderUnsplodeSpeed.addChangeListener(e -> model.setAnimUnsplodeSpeedMs(sliderUnsplodeSpeed.getValue()));
+        popContentPanel.add(wrapSlider("Unsplode Speed (ms)", sliderUnsplodeSpeed));
+
+        popContentPanel.add(Box.createVerticalStrut(6));
+        sliderUnsplodeStrength = new JSlider(85, 99, model.getAnimUnsplodeStrength());
+        sliderUnsplodeStrength.addChangeListener(e -> model.setAnimUnsplodeStrength(sliderUnsplodeStrength.getValue()));
+        popContentPanel.add(wrapSlider("Unsplode Strength", sliderUnsplodeStrength));
+
+        popContentPanel.add(Box.createVerticalStrut(6));
+        sliderGravPush = new JSlider(0, 100, model.getAnimGravityPush());
+        sliderGravPush.addChangeListener(e -> model.setAnimGravityPush(sliderGravPush.getValue()));
+        popContentPanel.add(wrapSlider("Gravity Push", sliderGravPush));
+
+        popContentPanel.add(Box.createVerticalStrut(6));
+        sliderGravPull = new JSlider(0, 100, model.getAnimGravityPull());
+        sliderGravPull.addChangeListener(e -> model.setAnimGravityPull(sliderGravPull.getValue()));
+        popContentPanel.add(wrapSlider("Gravity Pull", sliderGravPull));
+
+        popContentPanel.add(Box.createVerticalStrut(12));
+        JLabel gravFocalLbl = new JLabel("Gravity Target:");
+        gravFocalLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        popContentPanel.add(gravFocalLbl);
+        popContentPanel.add(Box.createVerticalStrut(4));
+
+        sliderGravFocalX = new JSlider(0, 100, model.getAnimGravityFocalX());
+        sliderGravFocalX.addChangeListener(e -> model.setAnimGravityFocalX(sliderGravFocalX.getValue()));
+        popContentPanel.add(wrapSlider("X %", sliderGravFocalX));
+        popContentPanel.add(Box.createVerticalStrut(4));
+
+        sliderGravFocalY = new JSlider(0, 100, model.getAnimGravityFocalY());
+        sliderGravFocalY.addChangeListener(e -> model.setAnimGravityFocalY(sliderGravFocalY.getValue()));
+        popContentPanel.add(wrapSlider("Y %", sliderGravFocalY));
+
+        popContentPanel.add(Box.createVerticalStrut(10));
+        JCheckBox chkStayInCanvas = new JCheckBox("Stay in Canvas");
+        chkStayInCanvas.setSelected(model.isAnimStayInCanvas());
+        chkStayInCanvas.setAlignmentX(Component.LEFT_ALIGNMENT);
+        chkStayInCanvas.addActionListener(e -> model.setAnimStayInCanvas(chkStayInCanvas.isSelected()));
+        popContentPanel.add(chkStayInCanvas);
+
+        popContentPanel.add(Box.createVerticalStrut(6));
+        sliderPopHold = new JSlider(0, 100, 0);
+        sliderPopHold.addChangeListener(e -> model.setAnimPopHoldMs(sliderPopHold.getValue() * 20));
+        popContentPanel.add(wrapSlider("Hang Time (ms)", sliderPopHold, 20));
+
+        popContentPanel.add(Box.createVerticalStrut(12));
+        popContentPanel.add(makeBtn("Reset Defaults", e -> resetPopDefaults()));
+
+        // ── CardLayout to switch between burst and pop ───────────────────────
+        tabContent = new JPanel(new CardLayout());
+        tabContent.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tabContent.add(burstContentPanel, "burst");
+        tabContent.add(popContentPanel, "pop");
+        transformModeControls.add(tabContent);
+
+        btnBurstTab.addActionListener(e -> switchTab("burst"));
+        btnPopTab  .addActionListener(e -> switchTab("pop"));
 
         add(transformModeControls);
 
@@ -212,6 +316,14 @@ public class ActionPanel extends JPanel implements ChangeListener {
         sizeRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         sizeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, sizeRow.getPreferredSize().height));
         add(sizeRow);
+    }
+
+    private void switchTab(String key) {
+        boolean burst = "burst".equals(key);
+        btnBurstTab.setEnabled(!burst);
+        btnPopTab  .setEnabled(burst);
+        ((CardLayout) tabContent.getLayout()).show(tabContent, key);
+        model.setAnimEffectType(burst ? 0 : 1);
     }
 
     @Override
@@ -252,15 +364,41 @@ public class ActionPanel extends JPanel implements ChangeListener {
         return row;
     }
 
-    private void resetAnimDefaults() {
-        model.setAnimSpread(DEF_SPREAD);   sliderSpread.setValue(DEF_SPREAD);
-        model.setAnimSpeedMs(DEF_SPEED);   sliderSpeed.setValue(DEF_SPEED);
-        model.setAnimHoldMs(DEF_HOLD);     sliderHold.setValue(DEF_HOLD);
-        model.setAnimEasing(DEF_EASING);   comboEasing.setSelectedIndex(DEF_EASING);
-        model.setAnimFocalX(DEF_FOCAL_X);  sliderFocalX.setValue(DEF_FOCAL_X);
-        model.setAnimFocalY(DEF_FOCAL_Y);  sliderFocalY.setValue(DEF_FOCAL_Y);
+    private JPanel wrapSlider(String name, JSlider slider, int scale) {
+        JPanel row = new JPanel();
+        row.setLayout(new BoxLayout(row, BoxLayout.Y_AXIS));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel lbl = new JLabel(name + ": " + (slider.getValue() * scale));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        slider.setAlignmentX(Component.LEFT_ALIGNMENT);
+        slider.setMaximumSize(new Dimension(Integer.MAX_VALUE, slider.getPreferredSize().height));
+        slider.addChangeListener(e -> lbl.setText(name + ": " + (slider.getValue() * scale)));
+        row.add(lbl);
+        row.add(slider);
+        return row;
+    }
+
+    private void resetBurstDefaults() {
+        model.setAnimSpread(DEF_SPREAD);         sliderSpread.setValue(DEF_SPREAD);
+        model.setAnimSpeedMs(DEF_SPEED);         sliderSpeed.setValue(DEF_SPEED);
+        model.setAnimHoldMs(DEF_HOLD);           sliderHold.setValue(DEF_HOLD);
+        model.setAnimEasing(DEF_EASING);         comboEasing.setSelectedIndex(DEF_EASING);
+        model.setAnimFocalX(DEF_FOCAL_X);        sliderFocalX.setValue(DEF_FOCAL_X);
+        model.setAnimFocalY(DEF_FOCAL_Y);        sliderFocalY.setValue(DEF_FOCAL_Y);
         model.setAnimSpin(DEF_SPIN);             comboSpin.setSelectedIndex(DEF_SPIN);
         model.setAnimSpinStrength(DEF_SPIN_STRENGTH); sliderSpinStrength.setValue(DEF_SPIN_STRENGTH);
+    }
+
+    private void resetPopDefaults() {
+        model.setAnimExplodeSpeedMs(DEF_EXPLODE_SPEED);       sliderExplodeSpeed.setValue(DEF_EXPLODE_SPEED);
+        model.setAnimExplodeStrength(DEF_EXPLODE_STRENGTH);   sliderExplodeStrength.setValue(DEF_EXPLODE_STRENGTH);
+        model.setAnimUnsplodeSpeedMs(DEF_UNSPLODE_SPEED);     sliderUnsplodeSpeed.setValue(DEF_UNSPLODE_SPEED);
+        model.setAnimUnsplodeStrength(DEF_UNSPLODE_STRENGTH); sliderUnsplodeStrength.setValue(DEF_UNSPLODE_STRENGTH);
+        model.setAnimGravityPush(DEF_GRAV_PUSH);          sliderGravPush.setValue(DEF_GRAV_PUSH);
+        model.setAnimGravityPull(DEF_GRAV_PULL);      sliderGravPull.setValue(DEF_GRAV_PULL);
+        model.setAnimGravityFocalX(DEF_GRAV_FOCAL_X); sliderGravFocalX.setValue(DEF_GRAV_FOCAL_X);
+        model.setAnimGravityFocalY(DEF_GRAV_FOCAL_Y); sliderGravFocalY.setValue(DEF_GRAV_FOCAL_Y);
+        model.setAnimPopHoldMs(DEF_POP_HOLD);          sliderPopHold.setValue(DEF_POP_HOLD);
     }
 
     private JButton makeBtn(String label, ActionListener al) {
