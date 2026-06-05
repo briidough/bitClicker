@@ -260,6 +260,11 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 ? model.getAnimExplodeSpeedMs()
                 : model.getAnimUnsplodeSpeedMs();
             delta = 16f * 0.5f / phaseSpeed;
+        } else if (model.getAnimEffectType() == 2) {
+            int phaseMs = animProgress < 0.5f
+                ? Math.max(16, model.getAnimTwistFirstSpeedMs())
+                : Math.max(16, model.getAnimTwistSecondSpeedMs());
+            delta = 16f * 0.5f / phaseMs;
         } else {
             delta = 16f / model.getAnimSpeedMs();
         }
@@ -377,6 +382,54 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             case 2: return t*t*t*t;
             default: return t*t;
         }
+    }
+
+    private float sineEase(float t, float amount) {
+        float sinT = 0.5f * (1f - (float) Math.cos(Math.PI * t));
+        return t * (1f - amount) + sinT * amount;
+    }
+
+    private void paintPixelTwist(Graphics2D g) {
+        int cellSize = CELL * zoomLevel;
+        boolean fullSpin  = model.isAnimTwistFullSpin();
+        boolean spreadGap = model.isAnimTwistSpreadGap();
+        boolean ccw       = model.getAnimTwistDirection() == 1;
+        float drawSize    = cellSize * (spreadGap ? (1f - AnimConfig.TWIST_SPREAD_DEF * 2 / 100f) : 1f);
+
+        float angle;
+        int[][] pixels;
+        Color[] colors;
+
+        if (animProgress < 0.5f) {
+            float t = animProgress / 0.5f;
+            float eased = sineEase(t, model.getAnimTwistFirstSmooth() / 100f);
+            angle = eased * 90f;
+            pixels = fromPixels;
+            colors = fromColors;
+        } else {
+            float t = (animProgress - 0.5f) / 0.5f;
+            float eased = sineEase(t, model.getAnimTwistSecondSmooth() / 100f);
+            angle = fullSpin ? 90f + eased * 90f : 90f - eased * 90f;
+            pixels = toPixels.length > 0 ? toPixels : fromPixels;
+            colors = toColors.length > 0 ? toColors : fromColors;
+        }
+
+        double angleRad = Math.toRadians(ccw ? -angle : angle);
+        float half = drawSize / 2f;
+        java.awt.geom.AffineTransform base = g.getTransform();
+
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        for (int i = 0; i < pixels.length; i++) {
+            float cx = pixels[i][0] + cellSize / 2f;
+            float cy = pixels[i][1] + cellSize / 2f;
+            java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform(base);
+            at.translate(cx, cy);
+            at.rotate(angleRad);
+            g.setTransform(at);
+            g.setColor(colors[i]);
+            g.fillRect(Math.round(-half), Math.round(-half), Math.round(drawSize), Math.round(drawSize));
+        }
+        g.setTransform(base);
     }
 
     private void paintBurstPixels(Graphics g, int[][] pixels, Color[] colors, float[][] dirs, float offset) {
@@ -503,6 +556,8 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             if (animating) {
                 if (model.getAnimEffectType() == 1) {
                     paintPixelPop(g);
+                } else if (model.getAnimEffectType() == 2) {
+                    paintPixelTwist(g);
                 } else {
                     float spread = model.getAnimSpread();
                     int easing = model.getAnimEasing();
@@ -517,12 +572,17 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             } else {
                 Color[][] frame = frames.get(currentFrameIdx);
                 int size = frame.length;
+                boolean twistSpread = model.getAnimEffectType() == 2 && model.isAnimTwistSpreadGap();
+                int drawSz = twistSpread
+                    ? Math.round(cellSize * (1f - AnimConfig.TWIST_SPREAD_DEF * 2 / 100f))
+                    : cellSize;
+                int off = (cellSize - drawSz) / 2;
                 for (int row = 0; row < size; row++)
                     for (int col = 0; col < size; col++) {
                         Color c = frame[row][col];
                         if (c != null) {
                             g.setColor(c);
-                            g.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                            g.fillRect(col * cellSize + off, row * cellSize + off, drawSz, drawSz);
                         }
                     }
             }

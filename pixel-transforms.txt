@@ -1,0 +1,33 @@
+PIXEL TRANSFORMS
+================
+
+--- PIXEL BURST ---
+Each pixel flies outward from a configurable focal point, then returns home.
+The first half of the animation scatters pixels away using radial direction vectors;
+the second half pulls them back to their destination positions.
+A spin option blends the radial direction with a clockwise or counter-clockwise tangent,
+giving the explosion a swirling quality.
+Spread controls how far pixels travel, Speed controls duration, and Easing (Smooth/Sharp/Snappy)
+shapes the acceleration curve. Hold delays the next frame after pixels settle.
+Optional focal point X/Y sliders let you bias the explosion origin anywhere in the canvas.
+
+--- PIXEL POP ---
+A two-phase explode/unsplode effect with per-pixel randomized speeds and gravity.
+Explode phase: pixels scatter outward with individual speed variance (Gravity Push controls spread),
+while a separate gravity target (Gravity Pull + focal X/Y) bends all trajectories toward a point.
+An optional Extend phase continues the outward travel past the explode peak, held in place for
+Extend Duration ms before release.
+A configurable Delay holds pixels at their furthest position before the snap-back begins.
+Unsplode phase: pixels return to their destination with a snappy two-stage pull — slow glide until
+the Unsplode Strength threshold, then a rapid magnetic snap to the final position.
+Stay in Canvas clamps all pixels to the canvas boundary during flight.
+
+--- PIXEL TWIST ---
+Each pixel rotates in place around its center, clockwise or counter-clockwise, across two independent half-turns.
+The first half covers 0→180°; the second half either continues to 360° (full spin) or reverses to 0° (half spin).
+When multiple animation frames are loaded, the first frame renders during the first half and the second frame during the second half.
+Speed sliders independently set the duration of each half — 0 ms is an instant snap, 100 ms is the minimum, up to 1000 ms (1 second) at maximum.
+Smooth spin sliders (one per half) blend between uniform rotation (0) and a sine ease-in/ease-out curve (100), where speed
+ramps up from rest, peaks at full speed through the middle of the phase, and decelerates symmetrically back to a stop.
+A Spread checkbox expands a small gap between adjacent pixels so the rotation plane is visually distinct rather than a flat color flip.
+

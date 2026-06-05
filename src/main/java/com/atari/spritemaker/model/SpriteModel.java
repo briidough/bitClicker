@@ -45,6 +45,13 @@ public class SpriteModel {
     private int animPopHoldMs   = 0;
     private int animExtendMs    = 500;
     private boolean focalActive = false;
+    private int     animTwistFirstSpeedMs  = 300;
+    private int     animTwistSecondSpeedMs = 300;
+    private int     animTwistFirstSmooth   = 50;
+    private int     animTwistSecondSmooth  = 50;
+    private int     animTwistDirection     = 0;
+    private boolean animTwistFullSpin      = true;
+    private boolean animTwistSpreadGap     = false;
     private final List<ChangeListener> listeners = new ArrayList<>();
 
     public int getGridSize() { return gridSize; }
@@ -167,6 +174,20 @@ public class SpriteModel {
     public void setAnimExtendMs(int v)           { animExtendMs = v; }
     public boolean isFocalActive()    { return focalActive; }
     public void setFocalActive(boolean v) { if (focalActive == v) return; focalActive = v; fireChange(); }
+    public int  getAnimTwistFirstSpeedMs()          { return animTwistFirstSpeedMs; }
+    public void setAnimTwistFirstSpeedMs(int v)     { animTwistFirstSpeedMs = v; }
+    public int  getAnimTwistSecondSpeedMs()         { return animTwistSecondSpeedMs; }
+    public void setAnimTwistSecondSpeedMs(int v)    { animTwistSecondSpeedMs = v; }
+    public int  getAnimTwistFirstSmooth()           { return animTwistFirstSmooth; }
+    public void setAnimTwistFirstSmooth(int v)      { animTwistFirstSmooth = v; }
+    public int  getAnimTwistSecondSmooth()          { return animTwistSecondSmooth; }
+    public void setAnimTwistSecondSmooth(int v)     { animTwistSecondSmooth = v; }
+    public int  getAnimTwistDirection()             { return animTwistDirection; }
+    public void setAnimTwistDirection(int v)        { animTwistDirection = v; }
+    public boolean isAnimTwistFullSpin()            { return animTwistFullSpin; }
+    public void    setAnimTwistFullSpin(boolean v)  { animTwistFullSpin = v; }
+    public boolean isAnimTwistSpreadGap()           { return animTwistSpreadGap; }
+    public void    setAnimTwistSpreadGap(boolean v) { animTwistSpreadGap = v; fireChange(); }
 
     public void addChangeListener(ChangeListener l) { listeners.add(l); }
 

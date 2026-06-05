@@ -30,8 +30,8 @@ public class ActionPanel extends JPanel implements ChangeListener {
     private JPanel drawModeControls;
     private JPanel transformModeControls;
 
-    // Pixel Burst/Pop tab switcher
-    private JButton btnBurstTab, btnPopTab;
+    // Pixel Burst/Pop/Twist tab switcher
+    private JButton btnBurstTab, btnPopTab, btnTwistTab;
     private JPanel tabContent;
 
     private java.io.File lastDir = null;
@@ -102,32 +102,37 @@ public class ActionPanel extends JPanel implements ChangeListener {
         transformModeControls.add(Box.createVerticalStrut(4));
         transformModeControls.add(makeBtn("Load Animation Frames", e -> loadAnimationFrames()));
 
-        // Tab buttons: Pixel Burst | Pixel Pop
+        // Tab buttons: Pixel Burst | Pixel Pop | Pixel Twist
         transformModeControls.add(Box.createVerticalStrut(8));
         btnBurstTab = new JButton("Pixel Burst");
         btnPopTab   = new JButton("Pixel Pop");
+        btnTwistTab = new JButton("Pixel Twist");
         btnBurstTab.setEnabled(false); // active by default → greyed
-        JPanel tabRow = new JPanel(new GridLayout(1, 2, 2, 0));
+        JPanel tabRow = new JPanel(new GridLayout(1, 3, 2, 0));
         tabRow.add(btnBurstTab);
         tabRow.add(btnPopTab);
+        tabRow.add(btnTwistTab);
         tabRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         tabRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, tabRow.getPreferredSize().height));
         transformModeControls.add(tabRow);
 
         transformModeControls.add(Box.createVerticalStrut(6));
 
-        PixelBurstPanel burstContentPanel = new PixelBurstPanel(model);
-        PixelPopPanel   popContentPanel   = new PixelPopPanel(model);
+        PixelBurstPanel  burstContentPanel = new PixelBurstPanel(model);
+        PixelPopPanel    popContentPanel   = new PixelPopPanel(model);
+        PixelTwistPanel  twistContentPanel = new PixelTwistPanel(model);
 
-        // ── CardLayout to switch between burst and pop ───────────────────────
+        // ── CardLayout to switch between burst, pop, and twist ───────────────
         tabContent = new JPanel(new CardLayout());
         tabContent.setAlignmentX(Component.LEFT_ALIGNMENT);
         tabContent.add(burstContentPanel, "burst");
         tabContent.add(popContentPanel, "pop");
+        tabContent.add(twistContentPanel, "twist");
         transformModeControls.add(tabContent);
 
         btnBurstTab.addActionListener(e -> switchTab("burst"));
         btnPopTab  .addActionListener(e -> switchTab("pop"));
+        btnTwistTab.addActionListener(e -> switchTab("twist"));
 
         add(transformModeControls);
 
@@ -162,11 +167,12 @@ public class ActionPanel extends JPanel implements ChangeListener {
     }
 
     private void switchTab(String key) {
-        boolean burst = "burst".equals(key);
-        btnBurstTab.setEnabled(!burst);
-        btnPopTab  .setEnabled(burst);
+        btnBurstTab.setEnabled(!"burst".equals(key));
+        btnPopTab  .setEnabled(!"pop"  .equals(key));
+        btnTwistTab.setEnabled(!"twist".equals(key));
         ((CardLayout) tabContent.getLayout()).show(tabContent, key);
-        model.setAnimEffectType(burst ? 0 : 1);
+        int type = "burst".equals(key) ? 0 : "pop".equals(key) ? 1 : 2;
+        model.setAnimEffectType(type);
     }
 
     @Override

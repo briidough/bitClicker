@@ -35,4 +35,13 @@ public final class AnimConfig {
     public static final int POP_HOLD_SCALE = 20; // slider value × 20 = actual ms
 
     public static final int POP_EXTEND_MS_MIN = 0, POP_EXTEND_MS_MAX = 2000, POP_EXTEND_MS_DEF = 500;
+
+    // ── Pixel Twist ──────────────────────────────────────────────────────────
+
+    public static final int TWIST_FIRST_SPEED_MIN  = 0, TWIST_FIRST_SPEED_MAX  = 100, TWIST_FIRST_SPEED_DEF  = 30;
+    public static final int TWIST_SECOND_SPEED_MIN = 0, TWIST_SECOND_SPEED_MAX = 100, TWIST_SECOND_SPEED_DEF = 30;
+    public static final int TWIST_FIRST_SMOOTH_MIN  = 0, TWIST_FIRST_SMOOTH_MAX  = 100, TWIST_FIRST_SMOOTH_DEF  = 50;
+    public static final int TWIST_SECOND_SMOOTH_MIN = 0, TWIST_SECOND_SMOOTH_MAX = 100, TWIST_SECOND_SMOOTH_DEF = 50;
+    public static final int TWIST_SPEED_SCALE = 10; // slider value * 10 = milliseconds
+    public static final int TWIST_SPREAD_DEF  = 10; // % of cellSize shaved per side when spread is on (20% total)
 }
