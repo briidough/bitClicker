@@ -77,7 +77,8 @@ public class SpriteEditorFrame extends JFrame {
         add(split, BorderLayout.CENTER);
 
         pack();
-        setMinimumSize(new Dimension(900, 600));
+        setSize((int)(getWidth() * 1.4), (int)(getHeight() * 1.4));
+        setMinimumSize(new Dimension(600, 600));
         setLocationRelativeTo(null);
     }
 }

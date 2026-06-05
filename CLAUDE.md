@@ -19,6 +19,8 @@ $JAVA_HOME/bin/java -jar sprite-editor.jar
 
 No external dependencies — pure Java 11+ with Swing only.
 
+Do not perform git checkins. Brendan will do that
+
 ## Architecture
 
 The app follows a simple MVC pattern with a shared model and event-driven panel updates.

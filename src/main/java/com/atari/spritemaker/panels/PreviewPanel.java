@@ -43,7 +43,9 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     private float[][] fromGravDirs;
     private float[] toSpeeds;
     private float[][] toGravDirs;
-    private int[][] explodedPositions; // final explode positions for single-frame unsplode
+    private int[][] explodedPositions;  // pixel positions at peak of explode (t=1.0)
+    private int[][] extendedPositions;  // pixel positions at end of extend phase
+    private int extendElapsedMs = 0;
 
     // Draw mode cache
     private BufferedImage drawCache;
@@ -192,33 +194,40 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             toSpeeds     = buildSpeeds(toPixels.length, variance);
             toGravDirs   = buildGravDirs(toPixels, gs);
 
-            if (nextFrameIdx == currentFrameIdx) {
-                // Single frame: pre-compute where pixels land at t_phase=1.0 of explode
-                // so unsplode can pick up exactly from those positions.
-                int cellSize = CELL * zoomLevel;
-                float spread = model.getAnimSpread();
-                float gravStrength = model.getAnimGravityPull() / 100f * spread * 6f;
-                boolean stay = model.isAnimStayInCanvas();
-                int bound = gs * cellSize - cellSize;
-                explodedPositions = new int[fromPixels.length][2];
-                float explodeStrength = model.getAnimExplodeStrength() / 100f;
-                for (int i = 0; i < fromPixels.length; i++) {
-                    // easingOut(1.0)==1.0 for all styles; diminish at t=1.0 is 0.8; gravOffset=gravStrength*1^2
-                    int px = (int)(fromPixels[i][0] + fromDirs[i][0] * spread * fromSpeeds[i] * explodeStrength * 0.8f + fromGravDirs[i][0] * gravStrength);
-                    int py = (int)(fromPixels[i][1] + fromDirs[i][1] * spread * fromSpeeds[i] * explodeStrength * 0.8f + fromGravDirs[i][1] * gravStrength);
-                    if (stay) {
-                        px = Math.max(0, Math.min(px, bound));
-                        py = Math.max(0, Math.min(py, bound));
-                    }
-                    explodedPositions[i][0] = px;
-                    explodedPositions[i][1] = py;
+            // Always pre-compute exploded and extended positions so all phases can lerp cleanly.
+            int cellSize = CELL * zoomLevel;
+            float spread = model.getAnimSpread();
+            float gravStrength = model.getAnimGravityPull() / 100f * spread * 6f;
+            boolean stay = model.isAnimStayInCanvas();
+            int bound = gs * cellSize - cellSize;
+            float explodeStrength = model.getAnimExplodeStrength() / 100f;
+            explodedPositions = new int[fromPixels.length][2];
+            extendedPositions = new int[fromPixels.length][2];
+            for (int i = 0; i < fromPixels.length; i++) {
+                // easingOut(1.0)==1.0 for all styles; diminish at t=1.0 is 0.8
+                float peakPushOff = spread * fromSpeeds[i] * explodeStrength * 0.8f;
+                int expX = (int)(fromPixels[i][0] + fromDirs[i][0] * peakPushOff + fromGravDirs[i][0] * gravStrength);
+                int expY = (int)(fromPixels[i][1] + fromDirs[i][1] * peakPushOff + fromGravDirs[i][1] * gravStrength);
+                if (stay) {
+                    expX = Math.max(0, Math.min(expX, bound));
+                    expY = Math.max(0, Math.min(expY, bound));
                 }
-            } else {
-                explodedPositions = null;
+                explodedPositions[i][0] = expX;
+                explodedPositions[i][1] = expY;
+                // Extended: continue along the actual trajectory (burst + gravity already baked into displacement)
+                int extX = expX + (expX - fromPixels[i][0]);
+                int extY = expY + (expY - fromPixels[i][1]);
+                if (stay) {
+                    extX = Math.max(0, Math.min(extX, bound));
+                    extY = Math.max(0, Math.min(extY, bound));
+                }
+                extendedPositions[i][0] = extX;
+                extendedPositions[i][1] = extY;
             }
         }
         animProgress = 0f;
         midHoldElapsedMs = 0;
+        extendElapsedMs = 0;
         animating = true;
         burstTimer.start();
     }
@@ -226,13 +235,23 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     private void tickBurst() {
         float delta;
         if (model.getAnimEffectType() == 1) {
-            // Hold particles at peak (animProgress==0.5) for the configured duration
-            int peakHoldMs = model.getAnimPopHoldMs();
-            if (animProgress >= 0.5f && midHoldElapsedMs < peakHoldMs) {
-                animProgress = 0.5f;
-                midHoldElapsedMs += 16;
-                canvas.repaint();
-                return;
+            if (animProgress >= 0.5f) {
+                // Extend phase: continue explode physics outward
+                int extendMs = model.getAnimExtendMs();
+                if (extendElapsedMs < extendMs) {
+                    animProgress = 0.5f;
+                    extendElapsedMs += 16;
+                    canvas.repaint();
+                    return;
+                }
+                // Delay phase: hold at final extended position
+                int peakHoldMs = model.getAnimPopHoldMs();
+                if (midHoldElapsedMs < peakHoldMs) {
+                    animProgress = 0.5f;
+                    midHoldElapsedMs += 16;
+                    canvas.repaint();
+                    return;
+                }
             }
             // Each phase covers 0.5 of animProgress, driven by its own speed
             int phaseSpeed = animProgress < 0.5f
@@ -375,15 +394,16 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         float gravStrength = model.getAnimGravityPull() / 100f * spread * 6f;
         float pullSpeed = 1.0f + model.getAnimGravityPull() / 100f;
         boolean stay = model.isAnimStayInCanvas();
-        int bound = model.getGridSize() * cellSize - cellSize; // max top-left for a pixel
+        int bound = model.getGridSize() * cellSize - cellSize;
 
         float explodeStrength = model.getAnimExplodeStrength() / 100f;
         float snapThreshold   = model.getAnimUnsplodeStrength() / 100f;
         float snapWindow      = 1f - snapThreshold;
 
+        int extendMs = model.getAnimExtendMs();
+
         if (animProgress < 0.5f) {
-            // Explode out: per-pixel random speeds + gravity pull toward focal
-            // Energy diminishes slightly as t increases (pixels lose steam)
+            // Explode: per-pixel random speeds + gravity, energy dims as t grows
             float t = animProgress / 0.5f;
             float tEased = easingOut(t, model.getAnimEasing());
             float diminish = 1f - t * 0.2f;
@@ -399,12 +419,32 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 g.setColor(fromColors[i]);
                 g.fillRect(px, py, cellSize, cellSize);
             }
+        } else if (extendMs > 0 && extendElapsedMs < extendMs) {
+            // Extend: continue from exploded positions along same direction
+            float extendT = (float) extendElapsedMs / extendMs;
+            for (int i = 0; i < fromPixels.length; i++) {
+                int px = (int)(explodedPositions[i][0] + (extendedPositions[i][0] - explodedPositions[i][0]) * extendT);
+                int py = (int)(explodedPositions[i][1] + (extendedPositions[i][1] - explodedPositions[i][1]) * extendT);
+                if (stay) {
+                    px = Math.max(0, Math.min(px, bound));
+                    py = Math.max(0, Math.min(py, bound));
+                }
+                g.setColor(fromColors[i]);
+                g.fillRect(px, py, cellSize, cellSize);
+            }
+        } else if (midHoldElapsedMs < model.getAnimPopHoldMs()) {
+            // Delay: hold at the furthest position (extended or exploded if no extend)
+            int[][] holdPos = extendMs > 0 ? extendedPositions : explodedPositions;
+            for (int i = 0; i < fromPixels.length; i++) {
+                g.setColor(fromColors[i]);
+                g.fillRect(holdPos[i][0], holdPos[i][1], cellSize, cellSize);
+            }
         } else {
-            // Unsplode in: 95% fast approach at per-pixel speed, final 5% snap
+            // Unsplode: lerp from the furthest position back to home
+            int[][] startPos = extendMs > 0 ? extendedPositions : explodedPositions;
             float t = (animProgress - 0.5f) / 0.5f;
             for (int i = 0; i < toPixels.length; i++) {
                 float approach = Math.min(1f, t * toSpeeds[i]);
-                // remainFrac: 1.0 = at start position, 0.0 = at home
                 float remainFrac;
                 if (approach < snapThreshold) {
                     remainFrac = 1f - approach;
@@ -412,15 +452,8 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                     float snapT = (approach - snapThreshold) / snapWindow;
                     remainFrac = snapWindow * (1f - Math.min(1f, snapT * pullSpeed));
                 }
-                int px, py;
-                if (explodedPositions != null) {
-                    // Lerp from actual exploded position back to home
-                    px = (int)(toPixels[i][0] + (explodedPositions[i][0] - toPixels[i][0]) * remainFrac);
-                    py = (int)(toPixels[i][1] + (explodedPositions[i][1] - toPixels[i][1]) * remainFrac);
-                } else {
-                    px = (int)(toPixels[i][0] + toDirs[i][0] * spread * remainFrac);
-                    py = (int)(toPixels[i][1] + toDirs[i][1] * spread * remainFrac);
-                }
+                int px = (int)(toPixels[i][0] + (startPos[i][0] - toPixels[i][0]) * remainFrac);
+                int py = (int)(toPixels[i][1] + (startPos[i][1] - toPixels[i][1]) * remainFrac);
                 if (stay) {
                     px = Math.max(0, Math.min(px, bound));
                     py = Math.max(0, Math.min(py, bound));

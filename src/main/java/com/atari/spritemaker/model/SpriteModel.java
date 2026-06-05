@@ -42,7 +42,8 @@ public class SpriteModel {
     private int animExplodeStrength   = 100; // 50–150 (% multiplier on push energy)
     private int animUnsplodeStrength  = 95;  // 85–99 (snap threshold %)
     private boolean animStayInCanvas  = false;
-    private int animPopHoldMs = 0;
+    private int animPopHoldMs   = 0;
+    private int animExtendMs    = 0;
     private boolean focalActive = false;
     private final List<ChangeListener> listeners = new ArrayList<>();
 
@@ -162,6 +163,8 @@ public class SpriteModel {
     public void setAnimStayInCanvas(boolean v)   { animStayInCanvas = v; }
     public int getAnimPopHoldMs()                { return animPopHoldMs; }
     public void setAnimPopHoldMs(int v)          { animPopHoldMs = v; }
+    public int getAnimExtendMs()                 { return animExtendMs; }
+    public void setAnimExtendMs(int v)           { animExtendMs = v; }
     public boolean isFocalActive()    { return focalActive; }
     public void setFocalActive(boolean v) { if (focalActive == v) return; focalActive = v; fireChange(); }
 
