@@ -43,7 +43,7 @@ public class SpriteModel {
     private int animUnsplodeStrength  = 95;  // 85–99 (snap threshold %)
     private boolean animStayInCanvas  = false;
     private int animPopHoldMs   = 0;
-    private int animExtendMs    = 0;
+    private int animExtendMs    = 500;
     private boolean focalActive = false;
     private final List<ChangeListener> listeners = new ArrayList<>();
 

@@ -34,5 +34,5 @@ public final class AnimConfig {
     public static final int POP_HOLD_MIN = 0, POP_HOLD_MAX = 100, POP_HOLD_DEF = 0;
     public static final int POP_HOLD_SCALE = 20; // slider value × 20 = actual ms
 
-    public static final int POP_EXTEND_MS_MIN = 0, POP_EXTEND_MS_MAX = 2000, POP_EXTEND_MS_DEF = 0;
+    public static final int POP_EXTEND_MS_MIN = 0, POP_EXTEND_MS_MAX = 2000, POP_EXTEND_MS_DEF = 500;
 }

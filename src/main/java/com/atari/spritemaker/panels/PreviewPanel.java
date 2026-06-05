@@ -214,9 +214,11 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 }
                 explodedPositions[i][0] = expX;
                 explodedPositions[i][1] = expY;
-                // Extended: continue along the actual trajectory (burst + gravity already baked into displacement)
-                int extX = expX + (expX - fromPixels[i][0]);
-                int extY = expY + (expY - fromPixels[i][1]);
+                // Extended: same trajectory, distance scaled so extend runs at the same px/ms as the explode
+                float extendRatio = model.getAnimExplodeSpeedMs() > 0
+                    ? (float) model.getAnimExtendMs() / model.getAnimExplodeSpeedMs() : 0f;
+                int extX = expX + (int)((expX - fromPixels[i][0]) * extendRatio);
+                int extY = expY + (int)((expY - fromPixels[i][1]) * extendRatio);
                 if (stay) {
                     extX = Math.max(0, Math.min(extX, bound));
                     extY = Math.max(0, Math.min(extY, bound));
