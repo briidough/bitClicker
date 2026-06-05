@@ -87,6 +87,7 @@ public class SpriteModel {
     public void setShowBgImage(boolean show) { showBgImage = show; fireChange(); }
 
     public Color getActiveColor() { return activeColor; }
+    public void setActiveColor(Color c) { activeColor = c; fireChange(); }
     public Color[] getPalette() { return palette; }
     public int getSelectedPaletteSlot() { return selectedPaletteSlot; }
 

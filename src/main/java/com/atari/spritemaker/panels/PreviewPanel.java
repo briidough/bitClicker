@@ -87,28 +87,28 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         btnZoom2x.addActionListener(e -> { zoomLevel = 2; drawDirty = true; canvas.repaint(); });
         btnZoom4x.addActionListener(e -> { zoomLevel = 4; drawDirty = true; canvas.repaint(); });
 
-        JPanel zoomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
-        zoomPanel.add(btnZoom1x);
-        zoomPanel.add(btnZoom2x);
-        zoomPanel.add(btnZoom4x);
+        JPanel zoomColumn = new JPanel();
+        zoomColumn.setLayout(new BoxLayout(zoomColumn, BoxLayout.Y_AXIS));
+        zoomColumn.setBorder(BorderFactory.createEmptyBorder(4, 2, 4, 4));
+        zoomColumn.add(btnZoom1x);
+        zoomColumn.add(Box.createVerticalStrut(2));
+        zoomColumn.add(btnZoom2x);
+        zoomColumn.add(Box.createVerticalStrut(2));
+        zoomColumn.add(btnZoom4x);
+        add(zoomColumn, BorderLayout.EAST);
 
-        // Animation controls (TRANSFORM mode only)
+        // Animation controls (TRANSFORM mode only) — Step, Play, Pause, Reset
         animControls = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
         JButton btnPlay  = new JButton("Play");
         JButton btnPause = new JButton("Pause");
         JButton btnStep  = new JButton("Step");
         JButton btnReset = new JButton("Reset");
+        animControls.add(btnStep);
         animControls.add(btnPlay);
         animControls.add(btnPause);
-        animControls.add(btnStep);
         animControls.add(btnReset);
         animControls.setVisible(false);
-
-        JPanel southPanel = new JPanel();
-        southPanel.setLayout(new BoxLayout(southPanel, BoxLayout.Y_AXIS));
-        southPanel.add(zoomPanel);
-        southPanel.add(animControls);
-        add(southPanel, BorderLayout.SOUTH);
+        add(animControls, BorderLayout.SOUTH);
 
         burstTimer = new javax.swing.Timer(16, e -> tickBurst());
         pauseTimer = new javax.swing.Timer(200, null);

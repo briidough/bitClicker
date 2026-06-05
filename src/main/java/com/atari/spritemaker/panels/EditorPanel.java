@@ -3,7 +3,6 @@ package com.atari.spritemaker.panels;
 import com.atari.spritemaker.model.SpriteModel;
 import com.atari.spritemaker.model.SpriteModel.DrawingTool;
 import com.atari.spritemaker.model.SpriteModel.Mode;
-import com.atari.spritemaker.ui.RetroTheme;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,10 +16,8 @@ public class EditorPanel extends JPanel implements ChangeListener {
     private static final int CELL = 10;
     private final SpriteModel model;
     private final GridCanvas gridCanvas;
-    private final PaletteBar paletteBar;
-    private final JButton pickColorBtn;
     private final JToggleButton eraserBtn;
-    private final JPanel controlsPanel;
+    private final JLabel modeLabel;
     private final FrameTabBar frameTabBar;
 
     public EditorPanel(SpriteModel model) {
@@ -30,40 +27,30 @@ public class EditorPanel extends JPanel implements ChangeListener {
         gridCanvas = new GridCanvas();
         add(new JScrollPane(gridCanvas), BorderLayout.CENTER);
 
-        paletteBar = new PaletteBar();
-        pickColorBtn = new JButton("Pick Color");
         eraserBtn = new JToggleButton("Eraser");
+        modeLabel = new JLabel("— Draw —");
+        modeLabel.setFont(modeLabel.getFont().deriveFont(Font.BOLD, 11f));
 
-        pickColorBtn.setEnabled(false);
-        pickColorBtn.addActionListener(e -> {
-            int slot = model.getSelectedPaletteSlot();
-            if (slot < 0) return;
-            Color init = model.getPalette()[slot];
-            Color chosen = JColorChooser.showDialog(this, "Pick Color", init);
-            if (chosen != null) { model.setPaletteSlotColor(slot, chosen); eraserBtn.setSelected(false); }
-        });
-
-        controlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        controlsPanel.add(paletteBar);
-        controlsPanel.add(pickColorBtn);
-        controlsPanel.add(eraserBtn);
+        JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        titleRow.add(modeLabel);
+        titleRow.add(eraserBtn);
 
         frameTabBar = new FrameTabBar();
         JPanel northContainer = new JPanel();
         northContainer.setLayout(new BoxLayout(northContainer, BoxLayout.Y_AXIS));
         northContainer.add(frameTabBar);
-        northContainer.add(controlsPanel);
+        northContainer.add(titleRow);
         add(northContainer, BorderLayout.NORTH);
     }
 
     @Override
     public void stateChanged(ChangeEvent e) {
         boolean isTransform = model.getMode() == Mode.TRANSFORM;
-        controlsPanel.setVisible(!isTransform);
+        modeLabel.setText(isTransform ? "— Transform —" : "— Draw —");
+        eraserBtn.setVisible(!isTransform);
+        if (model.getActiveColor() != null) eraserBtn.setSelected(false);
         if (model.getDrawingTool() == DrawingTool.PENCIL) gridCanvas.cancelLine();
         if (model.getDrawingTool() != DrawingTool.DRAG)   gridCanvas.clearDrag();
-        pickColorBtn.setEnabled(model.getSelectedPaletteSlot() >= 0);
-        paletteBar.repaint();
         gridCanvas.updateSize();
         gridCanvas.repaint();
         frameTabBar.refresh();
@@ -133,7 +120,6 @@ public class EditorPanel extends JPanel implements ChangeListener {
 
         private void applyDrag(int dr, int dc) {
             int size = model.getGridSize();
-            // Compute bounding box of all non-null cells in snapshot
             int minR = size, maxR = -1, minC = size, maxC = -1;
             for (int r = 0; r < size; r++)
                 for (int c = 0; c < size; c++)
@@ -144,10 +130,8 @@ public class EditorPanel extends JPanel implements ChangeListener {
                         if (c > maxC) maxC = c;
                     }
             if (maxR < 0) return;
-            // Clamp offset so no pixel goes out of bounds
             dr = Math.max(-minR, Math.min(dr, size - 1 - maxR));
             dc = Math.max(-minC, Math.min(dc, size - 1 - maxC));
-            // Build the shifted grid and write in one shot
             Color[][] shifted = new Color[size][size];
             for (int r = 0; r < size; r++)
                 for (int c = 0; c < size; c++)
@@ -252,54 +236,6 @@ public class EditorPanel extends JPanel implements ChangeListener {
             g.setColor(Color.WHITE);
             g.fillRect(x + half, y, half, half);
             g.fillRect(x, y + half, half, half);
-        }
-    }
-
-    private class PaletteBar extends JPanel {
-        private static final int SW = 56, SH = 32;
-
-        PaletteBar() {
-            setPreferredSize(new Dimension(SW * 5, SH));
-            addMouseListener(new MouseAdapter() {
-                @Override
-                public void mousePressed(MouseEvent e) {
-                    int slot = e.getX() / SW;
-                    if (slot >= 0 && slot < 5) {
-                        model.selectPaletteSlot(slot);
-                        if (model.getActiveColor() != null) eraserBtn.setSelected(false);
-                    }
-                }
-            });
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Color[] pal = model.getPalette();
-            int selected = model.getSelectedPaletteSlot();
-            for (int i = 0; i < 5; i++) {
-                int x = i * SW;
-                if (pal[i] == null) {
-                    drawSlotCheckerboard(g, x);
-                } else {
-                    g.setColor(pal[i]);
-                    g.fillRect(x, 0, SW, SH);
-                }
-                g.setColor(i == selected ? RetroTheme.paletteSelectBorder() : RetroTheme.paletteUnselectBorder());
-                g.drawRect(x, 0, SW - 1, SH - 1);
-                if (i == selected) g.drawRect(x + 1, 1, SW - 3, SH - 3);
-            }
-        }
-
-        private void drawSlotCheckerboard(Graphics g, int x) {
-            int sq = 8;
-            for (int dy = 0; dy < SH; dy += sq) {
-                for (int dx = 0; dx < SW; dx += sq) {
-                    g.setColor(((dx / sq + dy / sq) % 2 == 0)
-                        ? RetroTheme.checkA() : RetroTheme.checkB());
-                    g.fillRect(x + dx, dy, Math.min(sq, SW - dx), Math.min(sq, SH - dy));
-                }
-            }
         }
     }
 

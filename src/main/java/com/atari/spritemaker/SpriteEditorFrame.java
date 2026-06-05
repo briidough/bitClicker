@@ -12,35 +12,42 @@ public class SpriteEditorFrame extends JFrame {
         super("Sprite Editor");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        SpriteModel  model        = new SpriteModel();
-        ActionPanel  actionPanel  = new ActionPanel(model);
-        EditorPanel  editorPanel  = new EditorPanel(model);
-        PreviewPanel previewPanel = new PreviewPanel(model);
+        SpriteModel      model            = new SpriteModel();
+        PixelBurstPanel  burstPanel       = new PixelBurstPanel(model);
+        PixelPopPanel    popPanel         = new PixelPopPanel(model);
+        PixelTwistPanel  twistPanel       = new PixelTwistPanel(model);
+        PixelMorphPanel  morphPanel       = new PixelMorphPanel(model);
+        ActionEditsPanel actionEditsPanel = new ActionEditsPanel(model, burstPanel, popPanel, twistPanel, morphPanel);
+        ActionPanel      actionPanel      = new ActionPanel(model);
+        actionPanel.setActionEditsPanel(actionEditsPanel);
+        EditorPanel      editorPanel      = new EditorPanel(model);
+        PreviewPanel     previewPanel     = new PreviewPanel(model);
 
         model.addChangeListener(actionPanel);
         model.addChangeListener(editorPanel);
         model.addChangeListener(previewPanel);
+        model.addChangeListener(actionEditsPanel);
 
         // ── menu bar ──────────────────────────────────────────────────────────
         JMenuBar menuBar = new JMenuBar();
         JMenu fileMenu = new JMenu("File");
 
-        JMenuItem miNew    = new JMenuItem("New Sprite");
-        JMenuItem miLoad   = new JMenuItem("Load Sprite");
-        JMenuItem miSave   = new JMenuItem("Save Sprite");
-        JMenuItem miExport = new JMenuItem("Export SVG");
+        JMenuItem miNew     = new JMenuItem("New Sprite");
+        JMenuItem miLoad    = new JMenuItem("Load Sprite");
+        JMenuItem miSave    = new JMenuItem("Save Sprite");
+        JMenuItem miExport  = new JMenuItem("Export SVG");
         JMenuItem miLoadSvg = new JMenuItem("Load SVG");
 
-        miNew   .addActionListener(e -> actionPanel.newSprite());
-        miLoad  .addActionListener(e -> actionPanel.loadSprite());
-        miSave  .addActionListener(e -> actionPanel.saveSprite());
-        miExport.addActionListener(e -> actionPanel.exportSvg());
+        miNew    .addActionListener(e -> actionPanel.newSprite());
+        miLoad   .addActionListener(e -> actionPanel.loadSprite());
+        miSave   .addActionListener(e -> actionPanel.saveSprite());
+        miExport .addActionListener(e -> actionPanel.exportSvg());
         miLoadSvg.addActionListener(e -> actionPanel.loadSvg());
 
-        miNew   .setAccelerator(KeyStroke.getKeyStroke("ctrl N"));
-        miLoad  .setAccelerator(KeyStroke.getKeyStroke("ctrl O"));
-        miSave  .setAccelerator(KeyStroke.getKeyStroke("ctrl S"));
-        miExport.setAccelerator(KeyStroke.getKeyStroke("ctrl E"));
+        miNew    .setAccelerator(KeyStroke.getKeyStroke("ctrl N"));
+        miLoad   .setAccelerator(KeyStroke.getKeyStroke("ctrl O"));
+        miSave   .setAccelerator(KeyStroke.getKeyStroke("ctrl S"));
+        miExport .setAccelerator(KeyStroke.getKeyStroke("ctrl E"));
         miLoadSvg.setAccelerator(KeyStroke.getKeyStroke("ctrl L"));
 
         fileMenu.add(miNew);
@@ -49,7 +56,6 @@ public class SpriteEditorFrame extends JFrame {
         fileMenu.addSeparator();
         fileMenu.add(miExport);
         fileMenu.add(miLoadSvg);
-
         menuBar.add(fileMenu);
 
         // ── theme toggle ──────────────────────────────────────────────────────
@@ -61,32 +67,33 @@ public class SpriteEditorFrame extends JFrame {
             repaint();
         });
         menuBar.add(miRetro);
-
         setJMenuBar(menuBar);
 
         // ── layout ────────────────────────────────────────────────────────────
-        JSplitPane innerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+        JSplitPane editorPreviewSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
             editorPanel, previewPanel);
-        innerSplit.setResizeWeight(0.6);
+        editorPreviewSplit.setResizeWeight(0.65);
 
         JScrollPane actionScroll = new JScrollPane(actionPanel,
             JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
             JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         actionScroll.setBorder(null);
 
-        JSplitPane outerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-            actionScroll, innerSplit);
-        outerSplit.setResizeWeight(0.0);
-        add(outerSplit, BorderLayout.CENTER);
+        actionEditsPanel.setVisible(false);
+
+        JPanel mainContent = new JPanel();
+        mainContent.setLayout(new BoxLayout(mainContent, BoxLayout.X_AXIS));
+        mainContent.add(actionScroll);
+        mainContent.add(actionEditsPanel);
+        mainContent.add(editorPreviewSplit);
+        add(mainContent, BorderLayout.CENTER);
 
         pack();
-        setSize((int)(getWidth() * 1.68), (int)(getHeight() * 1.68));
-        setMinimumSize(new Dimension(600, 600));
+        setSize((int)(getWidth() * 1.4), (int)(getHeight() * 1.2));
+        setMinimumSize(new Dimension(700, 700));
         validate();
         setLocationRelativeTo(null);
-        SwingUtilities.invokeLater(() -> {
-            outerSplit.setDividerLocation(actionPanel.getPreferredSize().width + 8);
-            innerSplit.setDividerLocation(0.6);
-        });
+        SwingUtilities.invokeLater(() ->
+            editorPreviewSplit.setDividerLocation(0.65));
     }
 }

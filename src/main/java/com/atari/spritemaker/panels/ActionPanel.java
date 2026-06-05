@@ -21,18 +21,29 @@ import org.w3c.dom.NodeList;
 public class ActionPanel extends JPanel implements ChangeListener {
 
     private final SpriteModel model;
+
+    // Mode selector
+    private final JToggleButton btnDraw, btnTransform;
+
+    // Draw tools
     private final JToggleButton btnPencil, btnLine, btnDrag;
-    private final JToggleButton btn16, btn32, btn48, btn64, btn80;
+
+    // Grid size
+    private final JComboBox<String> gridSizeCombo;
+    private boolean comboUpdating = false;
+
+    // Draw mode extras
     private JButton btnFillFromImage;
     private JButton btnPasteImage;
     private JToggleButton btnShowBgImage;
-    private JButton transformBtn;
     private JPanel drawModeControls;
-    private JPanel transformModeControls;
 
-    // Pixel Burst/Pop/Twist/Morph tab switcher
-    private JButton btnBurstTab, btnPopTab, btnTwistTab, btnMorphTab;
-    private JPanel tabContent;
+    // Transform mode
+    private JPanel transformModeControls;
+    private JToggleButton btnBurst, btnPop, btnTwist, btnMorph;
+
+    // ActionEdits panel reference (injected after construction)
+    private ActionEditsPanel actionEditsPanel;
 
     private java.io.File lastDir = null;
 
@@ -41,8 +52,29 @@ public class ActionPanel extends JPanel implements ChangeListener {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
-        transformBtn = makeBtn("Transform", e -> toggleMode());
-        add(transformBtn);
+        // ── mode selector ────────────────────────────────────────────────────
+        btnDraw      = new JToggleButton("Draw");
+        btnTransform = new JToggleButton("Transform");
+        btnDraw.setSelected(true);
+        ButtonGroup modeGroup = new ButtonGroup();
+        modeGroup.add(btnDraw);
+        modeGroup.add(btnTransform);
+
+        btnDraw.addActionListener(e -> {
+            model.setMode(Mode.DRAW);
+            if (actionEditsPanel != null) { actionEditsPanel.setVisible(false); revalidateParent(); }
+        });
+        btnTransform.addActionListener(e -> {
+            model.setMode(Mode.TRANSFORM);
+            if (actionEditsPanel != null) { actionEditsPanel.setVisible(false); revalidateParent(); }
+        });
+
+        JPanel modeRow = new JPanel(new GridLayout(1, 2, 2, 0));
+        modeRow.add(btnDraw);
+        modeRow.add(btnTransform);
+        modeRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        modeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, modeRow.getPreferredSize().height));
+        add(modeRow);
 
         // ── draw-mode-only controls ──────────────────────────────────────────
         drawModeControls = new JPanel();
@@ -75,15 +107,46 @@ public class ActionPanel extends JPanel implements ChangeListener {
         ButtonGroup toolGrp = new ButtonGroup();
         toolGrp.add(btnPencil); toolGrp.add(btnLine); toolGrp.add(btnDrag);
 
-        btnPencil.addActionListener(e -> model.setDrawingTool(DrawingTool.PENCIL));
-        btnLine  .addActionListener(e -> model.setDrawingTool(DrawingTool.LINE));
-        btnDrag  .addActionListener(e -> model.setDrawingTool(DrawingTool.DRAG));
+        btnPencil.addActionListener(e -> {
+            model.setDrawingTool(DrawingTool.PENCIL);
+            if (actionEditsPanel != null) actionEditsPanel.showDrawMode();
+            revalidateParent();
+        });
+        btnLine.addActionListener(e -> {
+            model.setDrawingTool(DrawingTool.LINE);
+            if (actionEditsPanel != null) actionEditsPanel.showDrawMode();
+            revalidateParent();
+        });
+        btnDrag.addActionListener(e -> {
+            model.setDrawingTool(DrawingTool.DRAG);
+            if (actionEditsPanel != null) { actionEditsPanel.setVisible(false); revalidateParent(); }
+        });
 
-        JPanel toolRow = new JPanel(new GridLayout(1, 3, 2, 0));
-        toolRow.add(btnPencil); toolRow.add(btnLine); toolRow.add(btnDrag);
-        toolRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        toolRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, toolRow.getPreferredSize().height));
-        drawModeControls.add(toolRow);
+        // Re-click detection: toggle ActionEdits when already-selected tool is clicked again
+        btnPencil.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                if (model.getDrawingTool() == DrawingTool.PENCIL && actionEditsPanel != null) {
+                    if (actionEditsPanel.isVisible()) actionEditsPanel.setVisible(false);
+                    else actionEditsPanel.showDrawMode();
+                    revalidateParent();
+                }
+            }
+        });
+        btnLine.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                if (model.getDrawingTool() == DrawingTool.LINE && actionEditsPanel != null) {
+                    if (actionEditsPanel.isVisible()) actionEditsPanel.setVisible(false);
+                    else actionEditsPanel.showDrawMode();
+                    revalidateParent();
+                }
+            }
+        });
+
+        JPanel toolCol = new JPanel(new GridLayout(3, 1, 0, 2));
+        toolCol.add(btnPencil); toolCol.add(btnLine); toolCol.add(btnDrag);
+        toolCol.setAlignmentX(Component.LEFT_ALIGNMENT);
+        toolCol.setMaximumSize(new Dimension(Integer.MAX_VALUE, toolCol.getPreferredSize().height));
+        drawModeControls.add(toolCol);
 
         drawModeControls.add(Box.createVerticalStrut(12));
         btnShowBgImage = new JToggleButton("Show Pasted Image");
@@ -93,6 +156,24 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnShowBgImage.setMaximumSize(new Dimension(Integer.MAX_VALUE, btnShowBgImage.getPreferredSize().height));
         btnShowBgImage.addActionListener(e -> model.setShowBgImage(btnShowBgImage.isSelected()));
         drawModeControls.add(btnShowBgImage);
+
+        // Grid size dropdown (draw mode only)
+        drawModeControls.add(Box.createVerticalStrut(12));
+        JLabel gridLbl = new JLabel("Grid Size:");
+        gridLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        drawModeControls.add(gridLbl);
+        drawModeControls.add(Box.createVerticalStrut(4));
+
+        gridSizeCombo = new JComboBox<>(new String[]{ "16", "32", "48", "64", "80" });
+        gridSizeCombo.setSelectedItem("32");
+        gridSizeCombo.setAlignmentX(Component.LEFT_ALIGNMENT);
+        gridSizeCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, gridSizeCombo.getPreferredSize().height));
+        gridSizeCombo.addActionListener(e -> {
+            if (comboUpdating) return;
+            int size = Integer.parseInt((String) gridSizeCombo.getSelectedItem());
+            if (size != model.getGridSize()) confirmReset(size);
+        });
+        drawModeControls.add(gridSizeCombo);
 
         add(drawModeControls);
 
@@ -105,107 +186,88 @@ public class ActionPanel extends JPanel implements ChangeListener {
         transformModeControls.add(Box.createVerticalStrut(4));
         transformModeControls.add(makeBtn("Load Animation Frames", e -> loadAnimationFrames()));
 
-        // Tab buttons: Pixel Burst | Pixel Pop | Pixel Twist | Pixel Morph
         transformModeControls.add(Box.createVerticalStrut(8));
-        btnBurstTab = new JButton("Pixel Burst");
-        btnPopTab   = new JButton("Pixel Pop");
-        btnTwistTab = new JButton("Pixel Twist");
-        btnMorphTab = new JButton("Pixel Morph");
-        btnBurstTab.setEnabled(false); // active by default → greyed
-        JPanel tabRow = new JPanel(new GridLayout(1, 4, 2, 0));
-        tabRow.add(btnBurstTab);
-        tabRow.add(btnPopTab);
-        tabRow.add(btnTwistTab);
-        tabRow.add(btnMorphTab);
-        tabRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        tabRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, tabRow.getPreferredSize().height));
-        transformModeControls.add(tabRow);
 
-        transformModeControls.add(Box.createVerticalStrut(6));
+        btnBurst = new JToggleButton("Pixel Burst");
+        btnPop   = new JToggleButton("Pixel Pop");
+        btnTwist = new JToggleButton("Pixel Twist");
+        btnMorph = new JToggleButton("Pixel Morph");
+        btnBurst.setSelected(true);
 
-        PixelBurstPanel  burstContentPanel = new PixelBurstPanel(model);
-        PixelPopPanel    popContentPanel   = new PixelPopPanel(model);
-        PixelTwistPanel  twistContentPanel = new PixelTwistPanel(model);
-        PixelMorphPanel  morphContentPanel = new PixelMorphPanel(model);
+        ButtonGroup effectGroup = new ButtonGroup();
+        effectGroup.add(btnBurst); effectGroup.add(btnPop);
+        effectGroup.add(btnTwist); effectGroup.add(btnMorph);
 
-        // ── CardLayout to switch between burst, pop, twist, and morph ────────
-        tabContent = new JPanel(new CardLayout());
-        tabContent.setAlignmentX(Component.LEFT_ALIGNMENT);
-        tabContent.add(burstContentPanel, "burst");
-        tabContent.add(popContentPanel, "pop");
-        tabContent.add(twistContentPanel, "twist");
-        tabContent.add(morphContentPanel, "morph");
-        transformModeControls.add(tabContent);
+        btnBurst.addActionListener(e -> { switchTab("burst", 0); revalidateParent(); });
+        btnPop  .addActionListener(e -> { switchTab("pop",   1); revalidateParent(); });
+        btnTwist.addActionListener(e -> { switchTab("twist", 2); revalidateParent(); });
+        btnMorph.addActionListener(e -> { switchTab("morph", 3); revalidateParent(); });
 
-        btnBurstTab.addActionListener(e -> switchTab("burst"));
-        btnPopTab  .addActionListener(e -> switchTab("pop"));
-        btnTwistTab.addActionListener(e -> switchTab("twist"));
-        btnMorphTab.addActionListener(e -> switchTab("morph"));
+        btnBurst.addMouseListener(makeEffectReclick(0, "burst"));
+        btnPop  .addMouseListener(makeEffectReclick(1, "pop"));
+        btnTwist.addMouseListener(makeEffectReclick(2, "twist"));
+        btnMorph.addMouseListener(makeEffectReclick(3, "morph"));
+
+        JPanel tabCol = new JPanel(new GridLayout(4, 1, 0, 2));
+        tabCol.add(btnBurst); tabCol.add(btnPop); tabCol.add(btnTwist); tabCol.add(btnMorph);
+        tabCol.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tabCol.setMaximumSize(new Dimension(Integer.MAX_VALUE, tabCol.getPreferredSize().height));
+        transformModeControls.add(tabCol);
 
         add(transformModeControls);
 
-        // ── grid size (always visible) ────────────────────────────────────────
-        add(Box.createVerticalStrut(12));
-        JLabel lbl = new JLabel("Grid Size:");
-        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        add(lbl);
-        add(Box.createVerticalStrut(4));
-
-        btn16  = new JToggleButton("16");
-        btn32  = new JToggleButton("32");
-        btn48  = new JToggleButton("48");
-        btn64  = new JToggleButton("64");
-        btn80  = new JToggleButton("80");
-        btn32.setSelected(true);
-
-        ButtonGroup grp = new ButtonGroup();
-        grp.add(btn16); grp.add(btn32); grp.add(btn48); grp.add(btn64); grp.add(btn80);
-
-        btn16 .addActionListener(e -> confirmReset(16));
-        btn32 .addActionListener(e -> confirmReset(32));
-        btn48 .addActionListener(e -> confirmReset(48));
-        btn64 .addActionListener(e -> confirmReset(64));
-        btn80 .addActionListener(e -> confirmReset(80));
-
-        JPanel sizeRow = new JPanel(new GridLayout(1, 5, 2, 0));
-        sizeRow.add(btn16); sizeRow.add(btn32); sizeRow.add(btn48); sizeRow.add(btn64); sizeRow.add(btn80);
-        sizeRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sizeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, sizeRow.getPreferredSize().height));
-        add(sizeRow);
+        // ── responsive icons ─────────────────────────────────────────────────
+        setupResponsiveIcons();
     }
 
-    private void switchTab(String key) {
-        btnBurstTab.setEnabled(!"burst".equals(key));
-        btnPopTab  .setEnabled(!"pop"  .equals(key));
-        btnTwistTab.setEnabled(!"twist".equals(key));
-        btnMorphTab.setEnabled(!"morph".equals(key));
-        ((CardLayout) tabContent.getLayout()).show(tabContent, key);
-        int type = "burst".equals(key) ? 0
-                 : "pop"  .equals(key) ? 1
-                 : "twist".equals(key) ? 2
-                 : 3;
+    public void setActionEditsPanel(ActionEditsPanel p) {
+        this.actionEditsPanel = p;
+    }
+
+    private MouseAdapter makeEffectReclick(int effectType, String key) {
+        return new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                if (model.getAnimEffectType() == effectType && actionEditsPanel != null) {
+                    if (actionEditsPanel.isVisible()) actionEditsPanel.setVisible(false);
+                    else actionEditsPanel.showTransformMode(key);
+                    revalidateParent();
+                }
+            }
+        };
+    }
+
+    private void switchTab(String key, int type) {
         model.setAnimEffectType(type);
+        if (actionEditsPanel != null) actionEditsPanel.showTransformMode(key);
+    }
+
+    private void revalidateParent() {
+        // ActionPanel → JScrollPane viewport → JScrollPane → mainContent
+        Container p = getParent();
+        if (p != null) p = p.getParent();
+        if (p != null) p = p.getParent();
+        if (p != null) { p.revalidate(); p.repaint(); }
     }
 
     @Override
     public void stateChanged(ChangeEvent e) {
-        int size = model.getGridSize();
-        btn16 .setSelected(size == 16);
-        btn32 .setSelected(size == 32);
-        btn48 .setSelected(size == 48);
-        btn64 .setSelected(size == 64);
-        btn80 .setSelected(size == 80);
+        comboUpdating = true;
+        gridSizeCombo.setSelectedItem(String.valueOf(model.getGridSize()));
+        comboUpdating = false;
+
         btnPencil.setSelected(model.getDrawingTool() == DrawingTool.PENCIL);
         btnLine  .setSelected(model.getDrawingTool() == DrawingTool.LINE);
         btnDrag  .setSelected(model.getDrawingTool() == DrawingTool.DRAG);
+
         boolean hasImage = model.getBgImage() != null;
         btnFillFromImage.setEnabled(hasImage);
         btnShowBgImage.setEnabled(hasImage);
         btnShowBgImage.setSelected(model.isShowBgImage());
 
         boolean isTransform = model.getMode() == Mode.TRANSFORM;
-        transformBtn.setText(isTransform ? "Draw" : "Transform");
-        drawModeControls.setVisible(!isTransform);
+        btnDraw     .setSelected(!isTransform);
+        btnTransform.setSelected(isTransform);
+        drawModeControls    .setVisible(!isTransform);
         transformModeControls.setVisible(isTransform);
     }
 
@@ -219,10 +281,6 @@ public class ActionPanel extends JPanel implements ChangeListener {
         return b;
     }
 
-    private void toggleMode() {
-        model.setMode(model.getMode() == Mode.DRAW ? Mode.TRANSFORM : Mode.DRAW);
-    }
-
     private void confirmReset(int newSize) {
         int choice = JOptionPane.showConfirmDialog(this,
             "Reset grid? All pixels will be lost.", "Confirm Reset",
@@ -230,16 +288,110 @@ public class ActionPanel extends JPanel implements ChangeListener {
         if (choice == JOptionPane.OK_OPTION) {
             model.resetGrid(newSize);
         } else {
-            int cur = model.getGridSize();
-            btn16 .setSelected(cur == 16);
-            btn32 .setSelected(cur == 32);
-            btn48 .setSelected(cur == 48);
-            btn64 .setSelected(cur == 64);
-            btn80 .setSelected(cur == 80);
+            comboUpdating = true;
+            gridSizeCombo.setSelectedItem(String.valueOf(model.getGridSize()));
+            comboUpdating = false;
         }
     }
 
     public void newSprite()  { confirmReset(model.getGridSize()); }
+
+    // ── responsive icons ─────────────────────────────────────────────────────
+
+    private void setupResponsiveIcons() {
+        AbstractButton[] btns = {
+            btnDraw, btnTransform,
+            btnPencil, btnLine, btnDrag,
+            btnBurst, btnPop, btnTwist, btnMorph
+        };
+        for (AbstractButton btn : btns) {
+            btn.putClientProperty("fullText", btn.getText());
+            btn.putClientProperty("icon",     makeIcon(btn.getText()));
+        }
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                boolean collapsed = getWidth() < 80;
+                for (AbstractButton btn : btns) {
+                    if (collapsed) {
+                        btn.setText("");
+                        btn.setIcon((Icon) btn.getClientProperty("icon"));
+                    } else {
+                        btn.setText((String) btn.getClientProperty("fullText"));
+                        btn.setIcon(null);
+                    }
+                }
+            }
+        });
+    }
+
+    private static Icon makeIcon(String label) {
+        int sz = 16;
+        BufferedImage img = new BufferedImage(sz, sz, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        Color fg = UIManager.getColor("Button.foreground");
+        if (fg == null) fg = Color.DARK_GRAY;
+        g.setColor(fg);
+        g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+        switch (label) {
+            case "Pencil":
+            case "Draw":
+                g.drawLine(4, 12, 11, 5);
+                g.fillPolygon(new int[]{11, 13, 9}, new int[]{5, 3, 7}, 3);
+                g.drawLine(3, 13, 4, 12);
+                break;
+            case "Line":
+                g.fillOval(1, 1, 4, 4);
+                g.drawLine(3, 3, 13, 13);
+                g.fillOval(11, 11, 4, 4);
+                break;
+            case "Drag":
+                g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g.drawLine(8, 2, 8, 14);
+                g.drawLine(2, 8, 14, 8);
+                g.drawLine(8, 2, 6, 4);  g.drawLine(8, 2, 10, 4);
+                g.drawLine(8, 14, 6, 12); g.drawLine(8, 14, 10, 12);
+                g.drawLine(2, 8, 4, 6);  g.drawLine(2, 8, 4, 10);
+                g.drawLine(14, 8, 12, 6); g.drawLine(14, 8, 12, 10);
+                break;
+            case "Transform":
+                g.drawOval(5, 5, 6, 6);
+                for (int a = 0; a < 360; a += 45) {
+                    double rad = Math.toRadians(a);
+                    g.drawLine(8 + (int)(4*Math.cos(rad)), 8 + (int)(4*Math.sin(rad)),
+                               8 + (int)(7*Math.cos(rad)), 8 + (int)(7*Math.sin(rad)));
+                }
+                break;
+            case "Pixel Burst":
+                for (int a = 0; a < 360; a += 30) {
+                    double rad = Math.toRadians(a);
+                    g.drawLine(8, 8, 8 + (int)(6*Math.cos(rad)), 8 + (int)(6*Math.sin(rad)));
+                }
+                break;
+            case "Pixel Pop":
+                g.drawOval(5, 5, 6, 6);
+                for (int a = 0; a < 360; a += 90) {
+                    double rad = Math.toRadians(a);
+                    g.fillOval(6 + (int)(6*Math.cos(rad)), 6 + (int)(6*Math.sin(rad)), 3, 3);
+                }
+                break;
+            case "Pixel Twist":
+                g.drawArc(3, 3, 10, 10, 30, 300);
+                g.drawLine(12, 4, 14, 7);
+                break;
+            case "Pixel Morph":
+                g.fillOval(2, 5, 8, 8);
+                g.setColor(new Color(fg.getRed()/2+60, fg.getGreen()/2+60, fg.getBlue()/2+60));
+                g.fillOval(6, 5, 8, 8);
+                break;
+            default:
+                g.drawString("?", 5, 12);
+        }
+        g.dispose();
+        return new ImageIcon(img);
+    }
 
     // ── I/O ─────────────────────────────────────────────────────────────────
 
@@ -375,19 +527,16 @@ public class ActionPanel extends JPanel implements ChangeListener {
             return;
         }
 
-        // Use the largest frame's grid size as the canvas for all frames
         int targetSize = 16;
         for (Color[][] f : frames)
             if (f.length > targetSize) targetSize = f.length;
 
-        // First frame → apply to working grid (frame 0) with resize + alignment
         Color[][] aligned0 = alignFrame(frames.get(0), targetSize);
         model.resetGrid(targetSize);
         for (int r = 0; r < targetSize; r++)
             for (int c = 0; c < targetSize; c++)
                 if (aligned0[r][c] != null) model.setCellColor(r, c, aligned0[r][c]);
 
-        // Remaining frames → align to target size (alignFrame handles any source dimensions)
         if (frames.size() > 1) {
             java.util.List<Color[][]> additional = new java.util.ArrayList<>();
             for (int i = 1; i < frames.size(); i++)
@@ -412,9 +561,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         int contentWidth  = maxC - minC + 1;
         int contentHeight = maxR - minR + 1;
 
-        // Horizontal: center-2 (right-biases odd widths)
         int dc = canvasSize / 2 - minC - contentWidth / 2;
-        // Vertical: bottom-align for tall/square sprites; center for wide sprites
         int dr = contentWidth > contentHeight
             ? canvasSize / 2 - minR - contentHeight / 2
             : (canvasSize - 1) - maxR;
@@ -484,7 +631,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
             }
             if (gridSize == -1) {
                 JOptionPane.showMessageDialog(this,
-                    "SVG is too large (" + (maxCol + 1) + "×" + (maxRow + 1) + " cells). Max supported: 80×80. Min: 16×16.");
+                    "SVG is too large (" + (maxCol + 1) + "×" + (maxRow + 1) + " cells). Max supported: 80×80.");
                 return null;
             }
 
