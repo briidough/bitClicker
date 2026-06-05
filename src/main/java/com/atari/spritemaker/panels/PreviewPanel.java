@@ -47,6 +47,17 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     private int[][] extendedPositions;  // pixel positions at end of extend phase
     private int extendElapsedMs = 0;
 
+    // Pixel Morph extras
+    private int[][] morphStables;       // {x, y, rgb}
+    private int[][] morphBirths;        // {x, y, rgb} target position
+    private int[][] morphBirthOrigins;  // {originX, originY} per birth — parent cell's canvas position
+    private int[]   morphBirthWave;     // wave index per birth (0 = first to appear)
+    private int     morphTotalWaves;    // total waves (each gets 1/N of animation time)
+    private int[][] morphDeaths;        // {x, y, rgb} source; slides toward focal + shrinks
+    private int[][] morphRecolorOld;    // {x, y, oldRgb}; stays until t=1
+    private int[][] morphRecolorNew;    // {x, y, newRgb}; slides from focal to position
+    private float[] morphFocalPx;       // {focalX_px, focalY_px} in canvas coords
+
     // Draw mode cache
     private BufferedImage drawCache;
     private boolean drawDirty = true;
@@ -227,6 +238,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 extendedPositions[i][1] = extY;
             }
         }
+        if (model.getAnimEffectType() == 3) {
+            buildMorphData(frames.get(currentFrameIdx), frames.get(nextFrameIdx),
+                           frames.get(currentFrameIdx).length);
+        }
         animProgress = 0f;
         midHoldElapsedMs = 0;
         extendElapsedMs = 0;
@@ -265,6 +280,8 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 ? Math.max(16, model.getAnimTwistFirstSpeedMs())
                 : Math.max(16, model.getAnimTwistSecondSpeedMs());
             delta = 16f * 0.5f / phaseMs;
+        } else if (model.getAnimEffectType() == 3) {
+            delta = 16f / Math.max(16, model.getAnimMorphSpeedMs());
         } else {
             delta = 16f / model.getAnimSpeedMs();
         }
@@ -275,7 +292,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             burstTimer.stop();
             currentFrameIdx = nextFrameIdx;
             if (playing) {
-                pauseTimer.setDelay(Math.max(1, model.getAnimHoldMs()));
+                int holdMs = model.getAnimEffectType() == 3
+                    ? model.getAnimMorphHoldMs()
+                    : model.getAnimHoldMs();
+                pauseTimer.setDelay(Math.max(1, holdMs));
                 pauseTimer.start();
             }
         }
@@ -368,6 +388,126 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         return colors;
     }
 
+    private void buildMorphData(Color[][] from, Color[][] to, int gridSize) {
+        int cellSize = CELL * zoomLevel;
+        float totalPx = gridSize * cellSize;
+        float fx = totalPx * model.getAnimFocalX() / 100f;
+        float fy = totalPx * model.getAnimFocalY() / 100f;
+        morphFocalPx = new float[]{ fx, fy };
+
+        int focalCol = Math.max(0, Math.min(gridSize - 1, (int)(model.getAnimFocalX() / 100f * gridSize)));
+        int focalRow = Math.max(0, Math.min(gridSize - 1, (int)(model.getAnimFocalY() / 100f * gridSize)));
+
+        boolean[][] visited = new boolean[gridSize][gridSize];
+        java.util.Deque<int[]> queue = new java.util.ArrayDeque<>();
+        queue.add(new int[]{ focalRow, focalCol });
+        visited[focalRow][focalCol] = true;
+
+        java.util.List<int[]> stableList     = new java.util.ArrayList<>();
+        java.util.List<int[]> birthList      = new java.util.ArrayList<>();
+        java.util.List<int[]> deathList      = new java.util.ArrayList<>();
+        java.util.List<int[]> recolorOldList = new java.util.ArrayList<>();
+        java.util.List<int[]> recolorNewList = new java.util.ArrayList<>();
+
+        int[] dRow = {-1, 1, 0,  0};
+        int[] dCol = { 0, 0, -1, 1};
+
+        while (!queue.isEmpty()) {
+            int[] cur = queue.poll();
+            int r = cur[0], c = cur[1];
+            int px = c * cellSize, py = r * cellSize;
+
+            Color fColor = from[r][c];
+            Color tColor = to[r][c];
+
+            if      (fColor == null && tColor == null) { /* empty — no output */ }
+            else if (fColor != null && tColor != null && fColor.getRGB() == tColor.getRGB())
+                stableList.add(new int[]{ px, py, fColor.getRGB() });
+            else if (fColor == null)
+                birthList.add(new int[]{ px, py, tColor.getRGB() });
+            else if (tColor == null)
+                deathList.add(new int[]{ px, py, fColor.getRGB() });
+            else {
+                recolorOldList.add(new int[]{ px, py, fColor.getRGB() });
+                recolorNewList.add(new int[]{ px, py, tColor.getRGB() });
+            }
+
+            for (int d = 0; d < 4; d++) {
+                int nr = r + dRow[d], nc = c + dCol[d];
+                if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize && !visited[nr][nc]) {
+                    visited[nr][nc] = true;
+                    queue.add(new int[]{ nr, nc });
+                }
+            }
+        }
+
+        morphStables    = stableList    .toArray(new int[0][]);
+        morphBirths     = birthList     .toArray(new int[0][]);
+        morphDeaths     = deathList     .toArray(new int[0][]);
+        morphRecolorOld = recolorOldList.toArray(new int[0][]);
+        morphRecolorNew = recolorNewList.toArray(new int[0][]);
+
+        // Build grid lookup: birthGrid[row][col] = index into morphBirths, -1 if not a birth
+        int[][] birthGrid = new int[gridSize][gridSize];
+        for (int[] row : birthGrid) java.util.Arrays.fill(row, -1);
+        for (int i = 0; i < morphBirths.length; i++)
+            birthGrid[morphBirths[i][1] / cellSize][morphBirths[i][0] / cellSize] = i;
+
+        // Wave BFS: seed from all from-occupied cells, propagate through birth cells only.
+        // Wave 0 = births adjacent to existing (from) pixels.
+        // Wave k+1 = births adjacent to wave-k births.
+        // Each birth records the canvas position of its spawning cell as its origin.
+        int[] birthWaveAssign = new int[morphBirths.length];
+        java.util.Arrays.fill(birthWaveAssign, -1);
+        int[][] birthOriginArr = new int[morphBirths.length][2];
+        int maxAssignedWave = -1;
+
+        java.util.Deque<int[]> waveQ = new java.util.ArrayDeque<>();
+        boolean[][] waveVis = new boolean[gridSize][gridSize];
+        for (int r = 0; r < gridSize; r++)
+            for (int c = 0; c < gridSize; c++)
+                if (from[r][c] != null && !waveVis[r][c]) {
+                    waveVis[r][c] = true;
+                    waveQ.add(new int[]{ r, c, -1 });
+                }
+
+        while (!waveQ.isEmpty()) {
+            int[] cur = waveQ.poll();
+            int r = cur[0], c = cur[1], wave = cur[2];
+            for (int d = 0; d < 4; d++) {
+                int nr = r + dRow[d], nc = c + dCol[d];
+                if (nr < 0 || nr >= gridSize || nc < 0 || nc >= gridSize) continue;
+                int bIdx = birthGrid[nr][nc];
+                if (bIdx >= 0 && !waveVis[nr][nc]) {
+                    waveVis[nr][nc] = true;
+                    int nextWave = wave + 1;
+                    birthWaveAssign[bIdx] = nextWave;
+                    birthOriginArr[bIdx][0] = c * cellSize;  // spawning cell's canvas position
+                    birthOriginArr[bIdx][1] = r * cellSize;
+                    if (nextWave > maxAssignedWave) maxAssignedWave = nextWave;
+                    waveQ.add(new int[]{ nr, nc, nextWave });
+                }
+            }
+        }
+
+        // Floating births (no reachable from-cell chain): last wave, appear in place
+        int floatWave = maxAssignedWave < 0 ? 0 : maxAssignedWave + 1;
+        for (int i = 0; i < birthWaveAssign.length; i++) {
+            if (birthWaveAssign[i] < 0) {
+                birthWaveAssign[i] = floatWave;
+                birthOriginArr[i][0] = morphBirths[i][0];
+                birthOriginArr[i][1] = morphBirths[i][1];
+            }
+        }
+
+        morphBirthWave    = birthWaveAssign;
+        morphBirthOrigins = birthOriginArr;
+        int maxWave = -1;
+        for (int w : morphBirthWave) if (w > maxWave) maxWave = w;
+        morphTotalWaves = maxWave + 1;
+        if (morphTotalWaves < 1) morphTotalWaves = 1;
+    }
+
     private float easingOut(float t, int style) {
         switch (style) {
             case 1: return t;
@@ -430,6 +570,58 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             g.fillRect(Math.round(-half), Math.round(-half), Math.round(drawSize), Math.round(drawSize));
         }
         g.setTransform(base);
+    }
+
+    private void paintPixelMorph(Graphics2D g) {
+        int cellSize = CELL * zoomLevel;
+        float t = animProgress;
+        float focalX = morphFocalPx[0];
+        float focalY = morphFocalPx[1];
+
+        for (int[] p : morphStables) {
+            g.setColor(new Color(p[2]));
+            g.fillRect(p[0], p[1], cellSize, cellSize);
+        }
+
+        float waveSlice = morphTotalWaves > 0 ? 1f / morphTotalWaves : 1f;
+        for (int i = 0; i < morphBirths.length; i++) {
+            int[] p = morphBirths[i];
+            float ox = morphBirthOrigins[i][0];
+            float oy = morphBirthOrigins[i][1];
+            float waveStart = morphBirthWave[i] * waveSlice;
+            float localT = (t - waveStart) / waveSlice;
+            if (localT <= 0f) continue;  // not yet born
+            if (localT > 1f) localT = 1f;
+            int drawX = Math.round(ox + (p[0] - ox) * localT);
+            int drawY = Math.round(oy + (p[1] - oy) * localT);
+            g.setColor(new Color(p[2]));
+            g.fillRect(drawX, drawY, cellSize, cellSize);
+        }
+
+        for (int[] p : morphDeaths) {
+            int drawSize = Math.round(cellSize * (1f - t));
+            if (drawSize <= 0) continue;
+            int offset = (cellSize - drawSize) / 2;
+            g.setColor(new Color(p[2]));
+            g.fillRect(p[0] + offset, p[1] + offset, drawSize, drawSize);
+        }
+
+        for (int i = 0; i < morphRecolorOld.length; i++) {
+            int[] oldP = morphRecolorOld[i];
+            int[] newP = morphRecolorNew[i];
+            int oldSize = Math.round(cellSize * (1f - t));
+            if (oldSize > 0) {
+                int off = (cellSize - oldSize) / 2;
+                g.setColor(new Color(oldP[2]));
+                g.fillRect(oldP[0] + off, oldP[1] + off, oldSize, oldSize);
+            }
+            int newSize = Math.round(cellSize * t);
+            if (newSize > 0) {
+                int off = (cellSize - newSize) / 2;
+                g.setColor(new Color(newP[2]));
+                g.fillRect(newP[0] + off, newP[1] + off, newSize, newSize);
+            }
+        }
     }
 
     private void paintBurstPixels(Graphics g, int[][] pixels, Color[] colors, float[][] dirs, float offset) {
@@ -558,6 +750,8 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                     paintPixelPop(g);
                 } else if (model.getAnimEffectType() == 2) {
                     paintPixelTwist(g);
+                } else if (model.getAnimEffectType() == 3) {
+                    paintPixelMorph(g);
                 } else {
                     float spread = model.getAnimSpread();
                     int easing = model.getAnimEasing();

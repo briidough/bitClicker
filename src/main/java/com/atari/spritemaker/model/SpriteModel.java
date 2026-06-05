@@ -24,6 +24,8 @@ public class SpriteModel {
     private String filePath = null;
     private Mode mode = Mode.DRAW;
     private List<Color[][]> animationFrames = new ArrayList<>();
+    private int currentFrameIndex = 0;
+    private List<BufferedImage> frameBackgrounds = new ArrayList<>();
     private int animSpread  = 24;
     private int animSpeedMs = 500;
     private int animHoldMs  = 200;
@@ -52,7 +54,14 @@ public class SpriteModel {
     private int     animTwistDirection     = 0;
     private boolean animTwistFullSpin      = true;
     private boolean animTwistSpreadGap     = false;
+    private int animMorphSpeedMs = 600;
+    private int animMorphHoldMs  = 300;
     private final List<ChangeListener> listeners = new ArrayList<>();
+
+    public SpriteModel() {
+        animationFrames.add(grid);
+        frameBackgrounds.add(null);
+    }
 
     public int getGridSize() { return gridSize; }
     public String getAuthor() { return author; }
@@ -102,6 +111,10 @@ public class SpriteModel {
         gridSize = newSize;
         grid = new Color[newSize][newSize];
         animationFrames = new ArrayList<>();
+        animationFrames.add(grid);
+        frameBackgrounds = new ArrayList<>();
+        frameBackgrounds.add(null);
+        currentFrameIndex = 0;
         for (int i = 0; i < 5; i++) palette[i] = null;
         palette[0] = Color.BLACK;
         selectedPaletteSlot = 0;
@@ -131,6 +144,36 @@ public class SpriteModel {
 
     public List<Color[][]> getAnimationFrames() { return animationFrames; }
     public void setAnimationFrames(List<Color[][]> frames) { animationFrames = frames; fireChange(); }
+
+    public int getCurrentFrameIndex() { return currentFrameIndex; }
+    public int getFrameCount() { return animationFrames.size(); }
+
+    public void switchToFrame(int index) {
+        if (index < 0 || index >= animationFrames.size() || index == currentFrameIndex) return;
+        frameBackgrounds.set(currentFrameIndex, bgImage);
+        currentFrameIndex = index;
+        grid = animationFrames.get(index);
+        bgImage = frameBackgrounds.get(index);
+        showBgImage = true;
+        fireChange();
+    }
+
+    public void setAdditionalFrames(List<Color[][]> frames) {
+        frameBackgrounds.set(currentFrameIndex, bgImage);
+        while (animationFrames.size() > 1) animationFrames.remove(animationFrames.size() - 1);
+        while (frameBackgrounds.size() > 1) frameBackgrounds.remove(frameBackgrounds.size() - 1);
+        int count = Math.min(frames.size(), 5);
+        for (int i = 0; i < count; i++) {
+            animationFrames.add(frames.get(i));
+            frameBackgrounds.add(null);
+        }
+        if (currentFrameIndex >= animationFrames.size()) {
+            currentFrameIndex = 0;
+            grid = animationFrames.get(0);
+            bgImage = frameBackgrounds.get(0);
+        }
+        fireChange();
+    }
 
     public int getAnimSpread()   { return animSpread; }
     public void setAnimSpread(int v)  { animSpread = v; }
@@ -188,6 +231,10 @@ public class SpriteModel {
     public void    setAnimTwistFullSpin(boolean v)  { animTwistFullSpin = v; }
     public boolean isAnimTwistSpreadGap()           { return animTwistSpreadGap; }
     public void    setAnimTwistSpreadGap(boolean v) { animTwistSpreadGap = v; fireChange(); }
+    public int  getAnimMorphSpeedMs()      { return animMorphSpeedMs; }
+    public void setAnimMorphSpeedMs(int v) { if (animMorphSpeedMs == v) return; animMorphSpeedMs = v; fireChange(); }
+    public int  getAnimMorphHoldMs()       { return animMorphHoldMs; }
+    public void setAnimMorphHoldMs(int v)  { if (animMorphHoldMs == v) return; animMorphHoldMs = v; fireChange(); }
 
     public void addChangeListener(ChangeListener l) { listeners.add(l); }
 

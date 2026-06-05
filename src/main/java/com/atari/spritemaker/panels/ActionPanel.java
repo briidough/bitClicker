@@ -30,8 +30,8 @@ public class ActionPanel extends JPanel implements ChangeListener {
     private JPanel drawModeControls;
     private JPanel transformModeControls;
 
-    // Pixel Burst/Pop/Twist tab switcher
-    private JButton btnBurstTab, btnPopTab, btnTwistTab;
+    // Pixel Burst/Pop/Twist/Morph tab switcher
+    private JButton btnBurstTab, btnPopTab, btnTwistTab, btnMorphTab;
     private JPanel tabContent;
 
     private java.io.File lastDir = null;
@@ -57,6 +57,9 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnFillFromImage.setEnabled(false);
         drawModeControls.add(Box.createVerticalStrut(4));
         drawModeControls.add(btnFillFromImage);
+
+        drawModeControls.add(Box.createVerticalStrut(4));
+        drawModeControls.add(makeBtn("Load Animation Frames", e -> loadAnimationFrames()));
 
         drawModeControls.add(Box.createVerticalStrut(12));
         JLabel toolLbl = new JLabel("Drawing Tool:");
@@ -102,16 +105,18 @@ public class ActionPanel extends JPanel implements ChangeListener {
         transformModeControls.add(Box.createVerticalStrut(4));
         transformModeControls.add(makeBtn("Load Animation Frames", e -> loadAnimationFrames()));
 
-        // Tab buttons: Pixel Burst | Pixel Pop | Pixel Twist
+        // Tab buttons: Pixel Burst | Pixel Pop | Pixel Twist | Pixel Morph
         transformModeControls.add(Box.createVerticalStrut(8));
         btnBurstTab = new JButton("Pixel Burst");
         btnPopTab   = new JButton("Pixel Pop");
         btnTwistTab = new JButton("Pixel Twist");
+        btnMorphTab = new JButton("Pixel Morph");
         btnBurstTab.setEnabled(false); // active by default → greyed
-        JPanel tabRow = new JPanel(new GridLayout(1, 3, 2, 0));
+        JPanel tabRow = new JPanel(new GridLayout(1, 4, 2, 0));
         tabRow.add(btnBurstTab);
         tabRow.add(btnPopTab);
         tabRow.add(btnTwistTab);
+        tabRow.add(btnMorphTab);
         tabRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         tabRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, tabRow.getPreferredSize().height));
         transformModeControls.add(tabRow);
@@ -121,18 +126,21 @@ public class ActionPanel extends JPanel implements ChangeListener {
         PixelBurstPanel  burstContentPanel = new PixelBurstPanel(model);
         PixelPopPanel    popContentPanel   = new PixelPopPanel(model);
         PixelTwistPanel  twistContentPanel = new PixelTwistPanel(model);
+        PixelMorphPanel  morphContentPanel = new PixelMorphPanel(model);
 
-        // ── CardLayout to switch between burst, pop, and twist ───────────────
+        // ── CardLayout to switch between burst, pop, twist, and morph ────────
         tabContent = new JPanel(new CardLayout());
         tabContent.setAlignmentX(Component.LEFT_ALIGNMENT);
         tabContent.add(burstContentPanel, "burst");
         tabContent.add(popContentPanel, "pop");
         tabContent.add(twistContentPanel, "twist");
+        tabContent.add(morphContentPanel, "morph");
         transformModeControls.add(tabContent);
 
         btnBurstTab.addActionListener(e -> switchTab("burst"));
         btnPopTab  .addActionListener(e -> switchTab("pop"));
         btnTwistTab.addActionListener(e -> switchTab("twist"));
+        btnMorphTab.addActionListener(e -> switchTab("morph"));
 
         add(transformModeControls);
 
@@ -170,8 +178,12 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnBurstTab.setEnabled(!"burst".equals(key));
         btnPopTab  .setEnabled(!"pop"  .equals(key));
         btnTwistTab.setEnabled(!"twist".equals(key));
+        btnMorphTab.setEnabled(!"morph".equals(key));
         ((CardLayout) tabContent.getLayout()).show(tabContent, key);
-        int type = "burst".equals(key) ? 0 : "pop".equals(key) ? 1 : 2;
+        int type = "burst".equals(key) ? 0
+                 : "pop"  .equals(key) ? 1
+                 : "twist".equals(key) ? 2
+                 : 3;
         model.setAnimEffectType(type);
     }
 
@@ -208,21 +220,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
     }
 
     private void toggleMode() {
-        boolean toTransform = model.getMode() == Mode.DRAW;
-        if (toTransform) {
-            Color[][] copy = model.getGridCopy();
-            boolean hasContent = false;
-            outer:
-            for (Color[] row : copy)
-                for (Color c : row)
-                    if (c != null) { hasContent = true; break outer; }
-            if (hasContent) {
-                java.util.List<Color[][]> frames = new java.util.ArrayList<>();
-                frames.add(copy);
-                model.setAnimationFrames(frames);
-            }
-        }
-        model.setMode(toTransform ? Mode.TRANSFORM : Mode.DRAW);
+        model.setMode(model.getMode() == Mode.DRAW ? Mode.TRANSFORM : Mode.DRAW);
     }
 
     private void confirmReset(int newSize) {
@@ -376,16 +374,61 @@ public class ActionPanel extends JPanel implements ChangeListener {
             JOptionPane.showMessageDialog(this, "No valid SVG frames loaded.");
             return;
         }
-        model.setAnimationFrames(frames);
-        applyGridToModel(frames.get(0));
+
+        // Use the largest frame's grid size as the canvas for all frames
+        int targetSize = 16;
+        for (Color[][] f : frames)
+            if (f.length > targetSize) targetSize = f.length;
+
+        // First frame → apply to working grid (frame 0) with resize + alignment
+        Color[][] aligned0 = alignFrame(frames.get(0), targetSize);
+        model.resetGrid(targetSize);
+        for (int r = 0; r < targetSize; r++)
+            for (int c = 0; c < targetSize; c++)
+                if (aligned0[r][c] != null) model.setCellColor(r, c, aligned0[r][c]);
+
+        // Remaining frames → align to target size (alignFrame handles any source dimensions)
+        if (frames.size() > 1) {
+            java.util.List<Color[][]> additional = new java.util.ArrayList<>();
+            for (int i = 1; i < frames.size(); i++)
+                additional.add(alignFrame(frames.get(i), targetSize));
+            model.setAdditionalFrames(additional);
+        }
     }
 
-    private void applyGridToModel(Color[][] frame) {
-        int size = frame.length;
-        model.resetGrid(size);
-        for (int r = 0; r < size; r++)
-            for (int c = 0; c < size; c++)
-                if (frame[r][c] != null) model.setCellColor(r, c, frame[r][c]);
+    private Color[][] alignFrame(Color[][] src, int canvasSize) {
+        int srcSize = src.length;
+        int minR = srcSize, maxR = -1, minC = srcSize, maxC = -1;
+        for (int r = 0; r < srcSize; r++)
+            for (int c = 0; c < srcSize; c++)
+                if (src[r][c] != null) {
+                    if (r < minR) minR = r;
+                    if (r > maxR) maxR = r;
+                    if (c < minC) minC = c;
+                    if (c > maxC) maxC = c;
+                }
+        if (maxR < 0) return new Color[canvasSize][canvasSize];
+
+        int contentWidth  = maxC - minC + 1;
+        int contentHeight = maxR - minR + 1;
+
+        // Horizontal: center-2 (right-biases odd widths)
+        int dc = canvasSize / 2 - minC - contentWidth / 2;
+        // Vertical: bottom-align for tall/square sprites; center for wide sprites
+        int dr = contentWidth > contentHeight
+            ? canvasSize / 2 - minR - contentHeight / 2
+            : (canvasSize - 1) - maxR;
+
+        Color[][] result = new Color[canvasSize][canvasSize];
+        for (int r = 0; r < srcSize; r++)
+            for (int c = 0; c < srcSize; c++)
+                if (src[r][c] != null) {
+                    int nr = r + dr;
+                    int nc = c + dc;
+                    if (nr >= 0 && nr < canvasSize && nc >= 0 && nc < canvasSize)
+                        result[nr][nc] = src[r][c];
+                }
+        return result;
     }
 
     private Color[][] parseSvgFile(File file) {
@@ -400,23 +443,22 @@ public class ActionPanel extends JPanel implements ChangeListener {
             }
 
             double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
-            double totalW = 0;
-            int wCount = 0;
+            double minCellW = Double.MAX_VALUE;
             for (int i = 0; i < rects.getLength(); i++) {
                 Element r = (Element) rects.item(i);
                 double w = parseDouble(r.getAttribute("width"));
-                if (w > 0) { totalW += w; wCount++; }
+                if (w > 0 && w < minCellW) minCellW = w;
                 double x = parseDouble(r.getAttribute("x"));
                 double y = parseDouble(r.getAttribute("y"));
                 if (x < minX) minX = x;
                 if (y < minY) minY = y;
             }
 
-            if (wCount == 0) {
+            if (minCellW == Double.MAX_VALUE) {
                 JOptionPane.showMessageDialog(this, "Could not determine cell size from SVG: " + file.getName());
                 return null;
             }
-            double cellSize = totalW / wCount;
+            double cellSize = minCellW;
 
             java.util.List<int[]> cells = new java.util.ArrayList<>();
             int maxCol = 0, maxRow = 0;

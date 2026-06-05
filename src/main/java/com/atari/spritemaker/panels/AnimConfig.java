@@ -44,4 +44,9 @@ public final class AnimConfig {
     public static final int TWIST_SECOND_SMOOTH_MIN = 0, TWIST_SECOND_SMOOTH_MAX = 100, TWIST_SECOND_SMOOTH_DEF = 50;
     public static final int TWIST_SPEED_SCALE = 10; // slider value * 10 = milliseconds
     public static final int TWIST_SPREAD_DEF  = 10; // % of cellSize shaved per side when spread is on (20% total)
+
+    // ── Pixel Morph ──────────────────────────────────────────────────────────
+
+    public static final int MORPH_SPEED_MIN = 100,  MORPH_SPEED_MAX = 3000,  MORPH_SPEED_DEF = 600;
+    public static final int MORPH_HOLD_MIN  = 0,    MORPH_HOLD_MAX  = 2000,  MORPH_HOLD_DEF  = 300;
 }

@@ -5,6 +5,8 @@ import com.atari.spritemaker.model.SpriteModel.DrawingTool;
 import com.atari.spritemaker.model.SpriteModel.Mode;
 import com.atari.spritemaker.ui.RetroTheme;
 import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.awt.*;
@@ -19,6 +21,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
     private final JButton pickColorBtn;
     private final JToggleButton eraserBtn;
     private final JPanel controlsPanel;
+    private final FrameTabBar frameTabBar;
 
     public EditorPanel(SpriteModel model) {
         this.model = model;
@@ -44,7 +47,13 @@ public class EditorPanel extends JPanel implements ChangeListener {
         controlsPanel.add(paletteBar);
         controlsPanel.add(pickColorBtn);
         controlsPanel.add(eraserBtn);
-        add(controlsPanel, BorderLayout.NORTH);
+
+        frameTabBar = new FrameTabBar();
+        JPanel northContainer = new JPanel();
+        northContainer.setLayout(new BoxLayout(northContainer, BoxLayout.Y_AXIS));
+        northContainer.add(frameTabBar);
+        northContainer.add(controlsPanel);
+        add(northContainer, BorderLayout.NORTH);
     }
 
     @Override
@@ -57,6 +66,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
         paletteBar.repaint();
         gridCanvas.updateSize();
         gridCanvas.repaint();
+        frameTabBar.refresh();
     }
 
     private class GridCanvas extends JPanel {
@@ -181,7 +191,8 @@ public class EditorPanel extends JPanel implements ChangeListener {
             int size = model.getGridSize();
             int totalPx = size * CELL;
 
-            java.awt.image.BufferedImage bg = model.isShowBgImage() ? model.getBgImage() : null;
+            java.awt.image.BufferedImage bg = (model.getMode() == Mode.DRAW && model.isShowBgImage())
+                    ? model.getBgImage() : null;
             if (bg != null) {
                 g2.drawImage(bg, 0, 0, totalPx, totalPx, null);
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
@@ -289,6 +300,39 @@ public class EditorPanel extends JPanel implements ChangeListener {
                     g.fillRect(x + dx, dy, Math.min(sq, SW - dx), Math.min(sq, SH - dy));
                 }
             }
+        }
+    }
+
+    private class FrameTabBar extends JPanel {
+        private static final int MAX_FRAMES = 6;
+        private final List<JToggleButton> tabBtns = new ArrayList<>();
+        private final ButtonGroup tabGroup = new ButtonGroup();
+
+        FrameTabBar() {
+            setLayout(new FlowLayout(FlowLayout.LEFT, 2, 2));
+            for (int i = 0; i < MAX_FRAMES; i++) {
+                final int idx = i;
+                JToggleButton btn = new JToggleButton(String.valueOf(i + 1));
+                btn.setPreferredSize(new Dimension(32, 22));
+                btn.setMargin(new Insets(1, 2, 1, 2));
+                btn.addActionListener(e -> model.switchToFrame(idx));
+                tabGroup.add(btn);
+                tabBtns.add(btn);
+                add(btn);
+            }
+            refresh();
+        }
+
+        void refresh() {
+            int frameCount = model.getFrameCount();
+            int current = model.getCurrentFrameIndex();
+            for (int i = 0; i < MAX_FRAMES; i++) {
+                JToggleButton btn = tabBtns.get(i);
+                btn.setVisible(i < frameCount);
+                btn.setSelected(i == current);
+            }
+            revalidate();
+            repaint();
         }
     }
 }

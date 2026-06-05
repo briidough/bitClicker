@@ -65,20 +65,28 @@ public class SpriteEditorFrame extends JFrame {
         setJMenuBar(menuBar);
 
         // ── layout ────────────────────────────────────────────────────────────
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+        JSplitPane innerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
             editorPanel, previewPanel);
-        split.setResizeWeight(0.7);
+        innerSplit.setResizeWeight(0.6);
 
         JScrollPane actionScroll = new JScrollPane(actionPanel,
             JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
             JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         actionScroll.setBorder(null);
-        add(actionScroll, BorderLayout.WEST);
-        add(split, BorderLayout.CENTER);
+
+        JSplitPane outerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+            actionScroll, innerSplit);
+        outerSplit.setResizeWeight(0.0);
+        add(outerSplit, BorderLayout.CENTER);
 
         pack();
-        setSize((int)(getWidth() * 1.4), (int)(getHeight() * 1.4));
+        setSize((int)(getWidth() * 1.68), (int)(getHeight() * 1.68));
         setMinimumSize(new Dimension(600, 600));
+        validate();
         setLocationRelativeTo(null);
+        SwingUtilities.invokeLater(() -> {
+            outerSplit.setDividerLocation(actionPanel.getPreferredSize().width + 8);
+            innerSplit.setDividerLocation(0.6);
+        });
     }
 }
