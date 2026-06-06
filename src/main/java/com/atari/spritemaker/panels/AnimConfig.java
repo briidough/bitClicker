@@ -20,7 +20,7 @@ public final class AnimConfig {
     // ── Pixel Pop ────────────────────────────────────────────────────────────
 
     public static final int POP_EXPLODE_SPEED_MIN = 500,  POP_EXPLODE_SPEED_MAX = 2000,  POP_EXPLODE_SPEED_DEF = 1000;
-    public static final int POP_EXPLODE_STRENGTH_MIN = 50, POP_EXPLODE_STRENGTH_MAX = 150, POP_EXPLODE_STRENGTH_DEF = 100;
+    public static final int POP_EXPLODE_STRENGTH_MIN = 50, POP_EXPLODE_STRENGTH_MAX = 500, POP_EXPLODE_STRENGTH_DEF = 100; //150 is kinda explody but not much
 
     public static final int POP_UNSPLODE_SPEED_MIN = 500,  POP_UNSPLODE_SPEED_MAX = 2000,  POP_UNSPLODE_SPEED_DEF = 1000;
     public static final int POP_UNSPLODE_STRENGTH_MIN = 85, POP_UNSPLODE_STRENGTH_MAX = 99, POP_UNSPLODE_STRENGTH_DEF = 95;

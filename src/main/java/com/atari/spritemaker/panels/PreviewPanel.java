@@ -6,6 +6,7 @@ import com.atari.spritemaker.ui.RetroTheme;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.awt.*;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
@@ -47,6 +48,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     private int[][] explodedPositions;  // pixel positions at peak of explode (t=1.0)
     private int[][] extendedPositions;  // pixel positions at end of extend phase
     private int extendElapsedMs = 0;
+    private int lockedExtendMs = 0;     // extendMs captured at startBurst; must match extendedPositions
 
     // Pixel Morph extras
     private int[][] morphStables;       // {x, y, rgb}
@@ -58,6 +60,12 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     private int[][] morphRecolorOld;    // {x, y, oldRgb}; stays until t=1
     private int[][] morphRecolorNew;    // {x, y, newRgb}; slides from focal to position
     private float[] morphFocalPx;       // {focalX_px, focalY_px} in canvas coords
+
+    // Preview canvas background (user-controlled via BgColorSlider)
+    private Color canvasBg = RetroTheme.active
+        ? RetroTheme.BG_DARK
+        : (UIManager.getColor("Panel.background") != null
+            ? UIManager.getColor("Panel.background") : Color.LIGHT_GRAY);
 
     // Draw mode cache
     private BufferedImage drawCache;
@@ -72,7 +80,9 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         setLayout(new BorderLayout());
 
         canvas = new Canvas();
+        canvas.setBackground(canvasBg);
         add(canvas, BorderLayout.CENTER);
+        add(new BgColorSlider(), BorderLayout.WEST);
 
         // Zoom controls — always visible, enabled state depends on grid size
         btnZoom1x = new JToggleButton("1x");
@@ -215,6 +225,9 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             boolean stay = model.isAnimStayInCanvas();
             int bound = gs * cellSize - cellSize;
             float explodeStrength = model.getAnimExplodeStrength() / 100f;
+            lockedExtendMs = model.getAnimExtendMs();
+            float extendRatio = model.getAnimExplodeSpeedMs() > 0
+                ? (float) lockedExtendMs / model.getAnimExplodeSpeedMs() : 0f;
             explodedPositions = new int[fromPixels.length][2];
             extendedPositions = new int[fromPixels.length][2];
             for (int i = 0; i < fromPixels.length; i++) {
@@ -229,8 +242,6 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 explodedPositions[i][0] = expX;
                 explodedPositions[i][1] = expY;
                 // Extended: same trajectory, distance scaled so extend runs at the same px/ms as the explode
-                float extendRatio = model.getAnimExplodeSpeedMs() > 0
-                    ? (float) model.getAnimExtendMs() / model.getAnimExplodeSpeedMs() : 0f;
                 int extX = expX + (int)((expX - fromPixels[i][0]) * extendRatio);
                 int extY = expY + (int)((expY - fromPixels[i][1]) * extendRatio);
                 if (stay) {
@@ -257,7 +268,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         if (lockedEffectType == 1) {
             if (animProgress >= 0.5f) {
                 // Extend phase: continue explode physics outward
-                int extendMs = model.getAnimExtendMs();
+                int extendMs = lockedExtendMs;
                 if (extendElapsedMs < extendMs) {
                     animProgress = 0.5f;
                     extendElapsedMs += 16;
@@ -604,6 +615,8 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         for (int[] p : morphDeaths) {
             int drawSize = Math.round(cellSize * (1f - t));
             if (drawSize <= 0) continue;
+            g.setColor(canvasBg);
+            g.fillRect(p[0], p[1], cellSize, cellSize);
             int offset = (cellSize - drawSize) / 2;
             g.setColor(new Color(p[2]));
             g.fillRect(p[0] + offset, p[1] + offset, drawSize, drawSize);
@@ -612,17 +625,14 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         for (int i = 0; i < morphRecolorOld.length; i++) {
             int[] oldP = morphRecolorOld[i];
             int[] newP = morphRecolorNew[i];
+            // new color fills the full cell as background; old shrinks on top revealing it
+            g.setColor(new Color(newP[2]));
+            g.fillRect(newP[0], newP[1], cellSize, cellSize);
             int oldSize = Math.round(cellSize * (1f - t));
             if (oldSize > 0) {
                 int off = (cellSize - oldSize) / 2;
                 g.setColor(new Color(oldP[2]));
                 g.fillRect(oldP[0] + off, oldP[1] + off, oldSize, oldSize);
-            }
-            int newSize = Math.round(cellSize * t);
-            if (newSize > 0) {
-                int off = (cellSize - newSize) / 2;
-                g.setColor(new Color(newP[2]));
-                g.fillRect(newP[0] + off, newP[1] + off, newSize, newSize);
             }
         }
     }
@@ -650,7 +660,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         float snapThreshold   = model.getAnimUnsplodeStrength() / 100f;
         float snapWindow      = 1f - snapThreshold;
 
-        int extendMs = model.getAnimExtendMs();
+        int extendMs = lockedExtendMs;
 
         if (animProgress < 0.5f) {
             // Explode: per-pixel random speeds + gravity, energy dims as t grows
@@ -702,8 +712,9 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                     float snapT = (approach - snapThreshold) / snapWindow;
                     remainFrac = snapWindow * (1f - Math.min(1f, snapT * pullSpeed));
                 }
-                int px = (int)(toPixels[i][0] + (startPos[i][0] - toPixels[i][0]) * remainFrac);
-                int py = (int)(toPixels[i][1] + (startPos[i][1] - toPixels[i][1]) * remainFrac);
+                int sIdx = startPos.length > 0 ? i % startPos.length : -1;
+                int px = sIdx >= 0 ? (int)(toPixels[i][0] + (startPos[sIdx][0] - toPixels[i][0]) * remainFrac) : toPixels[i][0];
+                int py = sIdx >= 0 ? (int)(toPixels[i][1] + (startPos[sIdx][1] - toPixels[i][1]) * remainFrac) : toPixels[i][1];
                 if (stay) {
                     px = Math.max(0, Math.min(px, bound));
                     py = Math.max(0, Math.min(py, bound));
@@ -871,6 +882,90 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             g.setColor(Color.WHITE);
             g.fillRect(x + half, y, half, half);
             g.fillRect(x, y + half, half, half);
+        }
+    }
+
+    // ── background color slider ───────────────────────────────────────────────
+
+    private static Color bgSliderColor(int val) {
+        // 0=black (bottom) → 100=white (top), ROYGBIV in between
+        Color[] stops = {
+            Color.BLACK,
+            new Color(148,   0, 211),  // violet
+            new Color( 75,   0, 130),  // indigo
+            new Color(  0,   0, 255),  // blue
+            new Color(  0, 255,   0),  // green
+            new Color(255, 255,   0),  // yellow
+            new Color(255, 127,   0),  // orange
+            new Color(255,   0,   0),  // red
+            Color.WHITE
+        };
+        float pos = val / 12.5f;
+        int seg = Math.min((int) pos, stops.length - 2);
+        return blend(stops[seg], stops[seg + 1], pos - seg);
+    }
+
+    private static int colorToSliderVal(Color c) {
+        int best = 0;
+        double bestDist = Double.MAX_VALUE;
+        for (int v = 0; v <= 100; v++) {
+            Color g = bgSliderColor(v);
+            double d = Math.pow(g.getRed() - c.getRed(), 2)
+                     + Math.pow(g.getGreen() - c.getGreen(), 2)
+                     + Math.pow(g.getBlue() - c.getBlue(), 2);
+            if (d < bestDist) { bestDist = d; best = v; }
+        }
+        return best;
+    }
+
+    private static Color blend(Color a, Color b, float t) {
+        int r = Math.round(a.getRed()   + (b.getRed()   - a.getRed())   * t);
+        int g = Math.round(a.getGreen() + (b.getGreen() - a.getGreen()) * t);
+        int bl = Math.round(a.getBlue() + (b.getBlue()  - a.getBlue())  * t);
+        return new Color(r, g, bl);
+    }
+
+    private class BgColorSlider extends JPanel {
+        private static final int W = 14;
+        private static final int THUMB_H = 5;
+        private int val;
+
+        BgColorSlider() {
+            val = colorToSliderVal(canvasBg);
+            setPreferredSize(new Dimension(W, 80));
+            setMinimumSize(new Dimension(W, 40));
+            MouseAdapter ma = new MouseAdapter() {
+                @Override public void mousePressed(MouseEvent e)  { update(e.getY()); }
+                @Override public void mouseDragged(MouseEvent e)  { update(e.getY()); }
+                private void update(int y) {
+                    int trackH = getHeight() - THUMB_H;
+                    if (trackH <= 0) return;
+                    int raw = trackH - (y - THUMB_H / 2);
+                    val = Math.max(0, Math.min(100, Math.round(raw * 100f / trackH)));
+                    canvasBg = bgSliderColor(val);
+                    canvas.setBackground(canvasBg);
+                    canvas.repaint();
+                    repaint();
+                }
+            };
+            addMouseListener(ma);
+            addMouseMotionListener(ma);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            int h = getHeight() - THUMB_H;
+            // gradient track: white at top, black at bottom
+            for (int y = 0; y < h; y++) {
+                int v = 100 - Math.round(y * 100f / h);
+                g.setColor(bgSliderColor(v));
+                g.fillRect(0, y + THUMB_H / 2, W, 1);
+            }
+            // thumb
+            int thumbY = Math.round((100 - val) * h / 100f);
+            g.setColor(Color.WHITE);
+            g.drawRect(0, thumbY, W - 1, THUMB_H);
         }
     }
 }
