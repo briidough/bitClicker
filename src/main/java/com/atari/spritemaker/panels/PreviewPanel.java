@@ -29,6 +29,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     private boolean playing = false;
     private int currentFrameIdx = 0;
     private int nextFrameIdx = 0;
+    private int lockedEffectType = 0;
 
     // Per-transition pixel data
     private int[][] fromPixels;
@@ -124,7 +125,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         });
         btnStep.addActionListener(e -> {
             playing = false;
-            startBurst();
+            if (!animating) startBurst();
         });
         btnReset.addActionListener(e -> {
             playing = false;
@@ -187,8 +188,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     // ── animation logic ──────────────────────────────────────────────────────
 
     private void startBurst() {
+        burstTimer.stop();
         List<Color[][]> frames = model.getAnimationFrames();
         if (frames.isEmpty()) return;
+        lockedEffectType = model.getAnimEffectType();
         nextFrameIdx = frames.size() < 2 ? currentFrameIdx : (currentFrameIdx + 1) % frames.size();
         int gridSize = frames.get(currentFrameIdx).length;
         fromPixels = buildPixels(frames.get(currentFrameIdx), gridSize);
@@ -197,7 +200,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         toPixels   = buildPixels(frames.get(nextFrameIdx), gridSize);
         toColors   = buildColors(toPixels);
         toDirs     = buildDirs(toPixels, gridSize);
-        if (model.getAnimEffectType() == 1) {
+        if (lockedEffectType == 1) {
             float variance = model.getAnimGravityPush() / 100f;
             int gs = frames.get(currentFrameIdx).length;
             fromSpeeds   = buildSpeeds(fromPixels.length, variance);
@@ -238,7 +241,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 extendedPositions[i][1] = extY;
             }
         }
-        if (model.getAnimEffectType() == 3) {
+        if (lockedEffectType == 3) {
             buildMorphData(frames.get(currentFrameIdx), frames.get(nextFrameIdx),
                            frames.get(currentFrameIdx).length);
         }
@@ -251,7 +254,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
 
     private void tickBurst() {
         float delta;
-        if (model.getAnimEffectType() == 1) {
+        if (lockedEffectType == 1) {
             if (animProgress >= 0.5f) {
                 // Extend phase: continue explode physics outward
                 int extendMs = model.getAnimExtendMs();
@@ -275,12 +278,12 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 ? model.getAnimExplodeSpeedMs()
                 : model.getAnimUnsplodeSpeedMs();
             delta = 16f * 0.5f / phaseSpeed;
-        } else if (model.getAnimEffectType() == 2) {
+        } else if (lockedEffectType == 2) {
             int phaseMs = animProgress < 0.5f
                 ? Math.max(16, model.getAnimTwistFirstSpeedMs())
                 : Math.max(16, model.getAnimTwistSecondSpeedMs());
             delta = 16f * 0.5f / phaseMs;
-        } else if (model.getAnimEffectType() == 3) {
+        } else if (lockedEffectType == 3) {
             delta = 16f / Math.max(16, model.getAnimMorphSpeedMs());
         } else {
             delta = 16f / model.getAnimSpeedMs();
@@ -292,7 +295,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             burstTimer.stop();
             currentFrameIdx = nextFrameIdx;
             if (playing) {
-                int holdMs = model.getAnimEffectType() == 3
+                int holdMs = lockedEffectType == 3
                     ? model.getAnimMorphHoldMs()
                     : model.getAnimHoldMs();
                 pauseTimer.setDelay(Math.max(1, holdMs));
@@ -746,11 +749,11 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             }
 
             if (animating) {
-                if (model.getAnimEffectType() == 1) {
+                if (lockedEffectType == 1) {
                     paintPixelPop(g);
-                } else if (model.getAnimEffectType() == 2) {
+                } else if (lockedEffectType == 2) {
                     paintPixelTwist(g);
-                } else if (model.getAnimEffectType() == 3) {
+                } else if (lockedEffectType == 3) {
                     paintPixelMorph(g);
                 } else {
                     float spread = model.getAnimSpread();

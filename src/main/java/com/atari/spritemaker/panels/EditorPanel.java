@@ -243,6 +243,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
         private static final int MAX_FRAMES = 6;
         private final List<JToggleButton> tabBtns = new ArrayList<>();
         private final ButtonGroup tabGroup = new ButtonGroup();
+        private final JButton addBtn;
 
         FrameTabBar() {
             setLayout(new FlowLayout(FlowLayout.LEFT, 2, 2));
@@ -256,6 +257,11 @@ public class EditorPanel extends JPanel implements ChangeListener {
                 tabBtns.add(btn);
                 add(btn);
             }
+            addBtn = new JButton("+");
+            addBtn.setPreferredSize(new Dimension(28, 22));
+            addBtn.setMargin(new Insets(1, 2, 1, 2));
+            addBtn.addActionListener(e -> model.addFrame());
+            add(addBtn);
             refresh();
         }
 
@@ -267,6 +273,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
                 btn.setVisible(i < frameCount);
                 btn.setSelected(i == current);
             }
+            addBtn.setVisible(frameCount < MAX_FRAMES);
             revalidate();
             repaint();
         }

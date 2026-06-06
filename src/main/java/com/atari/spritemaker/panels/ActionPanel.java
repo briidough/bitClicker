@@ -17,6 +17,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import java.util.zip.*;
 
 public class ActionPanel extends JPanel implements ChangeListener {
 
@@ -748,6 +749,148 @@ public class ActionPanel extends JPanel implements ChangeListener {
             model.setBgImage(bi);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Paste failed: " + ex.getMessage());
+        }
+    }
+
+    // ── spriteamation (.sga) ────────────────────────────────────────────────
+
+    public void saveSpritamation() {
+        File file = chooseFile(false, "sga");
+        if (file == null) return;
+        String path = ensureExt(file.getAbsolutePath(), ".sga");
+        java.util.List<Color[][]> frames = model.getAnimationFrames();
+        int gridSize = model.getGridSize();
+        int canvasPx = gridSize * 4;
+        int saved = 0;
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(path))) {
+            for (int fi = 0; fi < frames.size(); fi++) {
+                Color[][] frame = frames.get(fi);
+                boolean hasContent = false;
+                outer:
+                for (int r = 0; r < frame.length; r++)
+                    for (int c = 0; c < frame[r].length; c++)
+                        if (frame[r][c] != null) { hasContent = true; break outer; }
+                if (!hasContent) continue;
+                StringBuilder sb = new StringBuilder();
+                sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+                sb.append(String.format("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\">%n",
+                    canvasPx, canvasPx, canvasPx, canvasPx));
+                for (int r = 0; r < frame.length; r++)
+                    for (int c = 0; c < frame[r].length; c++)
+                        if (frame[r][c] != null)
+                            sb.append(String.format("  <rect x=\"%d\" y=\"%d\" width=\"4\" height=\"4\" fill=\"#%s\"/>%n",
+                                c * 4, r * 4, hex(frame[r][c])));
+                sb.append("</svg>");
+                byte[] data = sb.toString().getBytes("UTF-8");
+                zos.putNextEntry(new ZipEntry("frame_" + fi + ".svg"));
+                zos.write(data);
+                zos.closeEntry();
+                saved++;
+            }
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Save Spriteamation failed: " + ex.getMessage());
+            return;
+        }
+        if (saved == 0)
+            JOptionPane.showMessageDialog(this, "No non-empty frames to save.");
+    }
+
+    public void loadSpritamation() {
+        File file = chooseFile(true, "sga");
+        if (file == null) return;
+        java.util.TreeMap<String, byte[]> entries = new java.util.TreeMap<>();
+        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(file))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.getName().endsWith(".svg")) {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    byte[] buf = new byte[4096];
+                    int n;
+                    while ((n = zis.read(buf)) != -1) baos.write(buf, 0, n);
+                    entries.put(entry.getName(), baos.toByteArray());
+                }
+                zis.closeEntry();
+            }
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Load Spriteamation failed: " + ex.getMessage());
+            return;
+        }
+        if (entries.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No SVG frames found in spriteamation file.");
+            return;
+        }
+        java.util.List<Color[][]> frames = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<String, byte[]> e : entries.entrySet()) {
+            Color[][] grid = parseSvgBytes(e.getValue(), e.getKey());
+            if (grid != null) frames.add(grid);
+        }
+        if (frames.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No valid frames loaded from spriteamation.");
+            return;
+        }
+        int targetSize = 16;
+        for (Color[][] f : frames) if (f.length > targetSize) targetSize = f.length;
+        Color[][] first = frames.get(0);
+        model.resetGrid(targetSize);
+        for (int r = 0; r < first.length; r++)
+            for (int c = 0; c < first[r].length; c++)
+                if (first[r][c] != null) model.setCellColor(r, c, first[r][c]);
+        if (frames.size() > 1) {
+            java.util.List<Color[][]> additional = new java.util.ArrayList<>();
+            for (int i = 1; i < frames.size(); i++) additional.add(frames.get(i));
+            model.setAdditionalFrames(additional);
+        }
+    }
+
+    private Color[][] parseSvgBytes(byte[] data, String entryName) {
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setNamespaceAware(true);
+            Document doc = dbf.newDocumentBuilder().parse(new ByteArrayInputStream(data));
+            NodeList rects = doc.getElementsByTagNameNS("*", "rect");
+            if (rects.getLength() == 0) {
+                JOptionPane.showMessageDialog(this, "No rect elements found in: " + entryName);
+                return null;
+            }
+            double minCellW = Double.MAX_VALUE;
+            for (int i = 0; i < rects.getLength(); i++) {
+                double w = parseDouble(((Element) rects.item(i)).getAttribute("width"));
+                if (w > 0 && w < minCellW) minCellW = w;
+            }
+            if (minCellW == Double.MAX_VALUE) {
+                JOptionPane.showMessageDialog(this, "Could not determine cell size from: " + entryName);
+                return null;
+            }
+            double cellSize = minCellW;
+            java.util.List<int[]> cells = new java.util.ArrayList<>();
+            int maxCol = 0, maxRow = 0;
+            for (int i = 0; i < rects.getLength(); i++) {
+                Element r = (Element) rects.item(i);
+                Color c = parseSvgColor(r);
+                if (c == null) continue;
+                int col = (int) Math.round(parseDouble(r.getAttribute("x")) / cellSize);
+                int row = (int) Math.round(parseDouble(r.getAttribute("y")) / cellSize);
+                cells.add(new int[]{ col, row, c.getRGB() });
+                if (col > maxCol) maxCol = col;
+                if (row > maxRow) maxRow = row;
+            }
+            if (cells.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No colored cells found in: " + entryName);
+                return null;
+            }
+            int gridSize = -1;
+            for (int s : new int[]{ 16, 32, 48, 64, 80 })
+                if (maxCol < s && maxRow < s) { gridSize = s; break; }
+            if (gridSize == -1) {
+                JOptionPane.showMessageDialog(this, "Frame too large in: " + entryName);
+                return null;
+            }
+            Color[][] grid = new Color[gridSize][gridSize];
+            for (int[] cell : cells) grid[cell[1]][cell[0]] = new Color(cell[2]);
+            return grid;
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Parse failed (" + entryName + "): " + ex.getMessage());
+            return null;
         }
     }
 

@@ -44,11 +44,18 @@ public class SpriteEditorFrame extends JFrame {
         miExport .addActionListener(e -> actionPanel.exportSvg());
         miLoadSvg.addActionListener(e -> actionPanel.loadSvg());
 
+        JMenuItem miSaveSga = new JMenuItem("Save Spriteamation");
+        JMenuItem miLoadSga = new JMenuItem("Load Spriteamation");
+        miSaveSga.addActionListener(e -> actionPanel.saveSpritamation());
+        miLoadSga.addActionListener(e -> actionPanel.loadSpritamation());
+
         miNew    .setAccelerator(KeyStroke.getKeyStroke("ctrl N"));
         miLoad   .setAccelerator(KeyStroke.getKeyStroke("ctrl O"));
         miSave   .setAccelerator(KeyStroke.getKeyStroke("ctrl S"));
         miExport .setAccelerator(KeyStroke.getKeyStroke("ctrl E"));
         miLoadSvg.setAccelerator(KeyStroke.getKeyStroke("ctrl L"));
+        miSaveSga.setAccelerator(KeyStroke.getKeyStroke("ctrl shift S"));
+        miLoadSga.setAccelerator(KeyStroke.getKeyStroke("ctrl shift O"));
 
         fileMenu.add(miNew);
         fileMenu.add(miLoad);
@@ -56,6 +63,9 @@ public class SpriteEditorFrame extends JFrame {
         fileMenu.addSeparator();
         fileMenu.add(miExport);
         fileMenu.add(miLoadSvg);
+        fileMenu.addSeparator();
+        fileMenu.add(miSaveSga);
+        fileMenu.add(miLoadSga);
         menuBar.add(fileMenu);
 
         // ── theme toggle ──────────────────────────────────────────────────────

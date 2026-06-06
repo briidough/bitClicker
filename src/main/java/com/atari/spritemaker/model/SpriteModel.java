@@ -159,6 +159,18 @@ public class SpriteModel {
         fireChange();
     }
 
+    public void addFrame() {
+        if (animationFrames.size() >= 6) return;
+        frameBackgrounds.set(currentFrameIndex, bgImage);
+        Color[][] blank = new Color[gridSize][gridSize];
+        animationFrames.add(blank);
+        frameBackgrounds.add(null);
+        currentFrameIndex = animationFrames.size() - 1;
+        grid = animationFrames.get(currentFrameIndex);
+        bgImage = null;
+        fireChange();
+    }
+
     public void setAdditionalFrames(List<Color[][]> frames) {
         frameBackgrounds.set(currentFrameIndex, bgImage);
         while (animationFrames.size() > 1) animationFrames.remove(animationFrames.size() - 1);
