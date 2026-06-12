@@ -3,6 +3,7 @@ package com.atari.spritemaker.panels;
 import com.atari.spritemaker.model.SpriteModel;
 import com.atari.spritemaker.model.SpriteModel.DrawingTool;
 import com.atari.spritemaker.model.SpriteModel.Mode;
+import com.atari.spritemaker.model.TransformSettings;
 import javax.swing.*;
 import javax.swing.event.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -17,6 +18,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import java.util.Properties;
 import java.util.zip.*;
 
 public class ActionPanel extends JPanel implements ChangeListener {
@@ -42,6 +44,9 @@ public class ActionPanel extends JPanel implements ChangeListener {
     // Transform mode
     private JPanel transformModeControls;
     private JToggleButton btnBurst, btnPop, btnTwist, btnMorph;
+    private JLabel uftLabel;
+    private ButtonGroup effectGroup;
+    private boolean wasTransformMode = false;
 
     // ActionEdits panel reference (injected after construction)
     private ActionEditsPanel actionEditsPanel;
@@ -187,6 +192,12 @@ public class ActionPanel extends JPanel implements ChangeListener {
         transformModeControls.add(Box.createVerticalStrut(4));
         transformModeControls.add(makeBtn("Load Animation Frames", e -> loadAnimationFrames()));
 
+        uftLabel = new JLabel("");
+        uftLabel.setFont(uftLabel.getFont().deriveFont(Font.BOLD, 10f));
+        uftLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        transformModeControls.add(Box.createVerticalStrut(4));
+        transformModeControls.add(uftLabel);
+
         transformModeControls.add(Box.createVerticalStrut(8));
 
         btnBurst = new JToggleButton("Pixel Burst");
@@ -195,7 +206,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnMorph = new JToggleButton("Pixel Morph");
         btnBurst.setSelected(true);
 
-        ButtonGroup effectGroup = new ButtonGroup();
+        effectGroup = new ButtonGroup();
         effectGroup.add(btnBurst); effectGroup.add(btnPop);
         effectGroup.add(btnTwist); effectGroup.add(btnMorph);
 
@@ -238,7 +249,12 @@ public class ActionPanel extends JPanel implements ChangeListener {
     }
 
     private void switchTab(String key, int type) {
-        model.setAnimEffectType(type);
+        model.setAnimEffectType(type);   // set effect type first so syncSelectedUFT captures it
+        model.syncSelectedUFT();
+        int sel = model.getSelectedUFTIndex();
+        if (sel >= 0 && !model.isUFTEnabled(sel)) {
+            model.toggleUFT(sel);
+        }
         if (actionEditsPanel != null) actionEditsPanel.showTransformMode(key);
     }
 
@@ -270,6 +286,37 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnTransform.setSelected(isTransform);
         drawModeControls    .setVisible(!isTransform);
         transformModeControls.setVisible(isTransform);
+
+        if (!isTransform) wasTransformMode = false;
+        wasTransformMode = isTransform;
+
+        if (isTransform) {
+            int selUFT = model.getSelectedUFTIndex();
+            if (selUFT >= 0 && !model.isUFTEnabled(selUFT)) {
+                effectGroup.clearSelection();
+                if (actionEditsPanel != null) actionEditsPanel.setVisible(false);
+            } else if (selUFT >= 0 && model.isUFTEnabled(selUFT)) {
+                int t = model.getAnimEffectType();
+                btnBurst.setSelected(t == 0);
+                btnPop  .setSelected(t == 1);
+                btnTwist.setSelected(t == 2);
+                btnMorph.setSelected(t == 3);
+                if (actionEditsPanel != null && !actionEditsPanel.isVisible()) {
+                    String key = t == 1 ? "pop" : t == 2 ? "twist" : t == 3 ? "morph" : "burst";
+                    actionEditsPanel.showTransformMode(key);
+                }
+            }
+
+            if (uftLabel != null) {
+                if (selUFT >= 0) {
+                    int N = model.getFrameCount();
+                    int next = (selUFT + 1) % N;
+                    uftLabel.setText("UFT " + (selUFT + 1) + " → " + (next + 1));
+                } else {
+                    uftLabel.setText(model.isFullAnimationMode() ? "Full animation" : "");
+                }
+            }
+        }
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
@@ -787,6 +834,50 @@ public class ActionPanel extends JPanel implements ChangeListener {
                 zos.closeEntry();
                 saved++;
             }
+            // Write UFT config
+            model.syncSelectedUFT();
+            int N = model.getFrameCount();
+            StringBuilder props = new StringBuilder();
+            props.append("UFT_COUNT=").append(N).append("\n");
+            props.append("FULL_ANIMATION_MODE=").append(model.isFullAnimationMode()).append("\n");
+            for (int i = 0; i < N; i++) {
+                String p = "UFT_" + i + "_";
+                TransformSettings s = model.getUFTSettings(i);
+                props.append(p).append("ENABLED=").append(model.isUFTEnabled(i)).append("\n");
+                props.append(p).append("EFFECT_TYPE=").append(s.animEffectType).append("\n");
+                props.append(p).append("SPREAD=").append(s.animSpread).append("\n");
+                props.append(p).append("SPEED_MS=").append(s.animSpeedMs).append("\n");
+                props.append(p).append("HOLD_MS=").append(s.animHoldMs).append("\n");
+                props.append(p).append("EASING=").append(s.animEasing).append("\n");
+                props.append(p).append("FOCAL_X=").append(s.animFocalX).append("\n");
+                props.append(p).append("FOCAL_Y=").append(s.animFocalY).append("\n");
+                props.append(p).append("SPIN=").append(s.animSpin).append("\n");
+                props.append(p).append("SPIN_STRENGTH=").append(s.animSpinStrength).append("\n");
+                props.append(p).append("EXPLODE_SPEED_MS=").append(s.animExplodeSpeedMs).append("\n");
+                props.append(p).append("EXPLODE_STRENGTH=").append(s.animExplodeStrength).append("\n");
+                props.append(p).append("UNSPLODE_SPEED_MS=").append(s.animUnsplodeSpeedMs).append("\n");
+                props.append(p).append("UNSPLODE_STRENGTH=").append(s.animUnsplodeStrength).append("\n");
+                props.append(p).append("GRAVITY_PUSH=").append(s.animGravityPush).append("\n");
+                props.append(p).append("GRAVITY_PULL=").append(s.animGravityPull).append("\n");
+                props.append(p).append("GRAVITY_FOCAL_X=").append(s.animGravityFocalX).append("\n");
+                props.append(p).append("GRAVITY_FOCAL_Y=").append(s.animGravityFocalY).append("\n");
+                props.append(p).append("POP_HOLD_MS=").append(s.animPopHoldMs).append("\n");
+                props.append(p).append("EXTEND_MS=").append(s.animExtendMs).append("\n");
+                props.append(p).append("TWIST_FIRST_SPEED_MS=").append(s.animTwistFirstSpeedMs).append("\n");
+                props.append(p).append("TWIST_SECOND_SPEED_MS=").append(s.animTwistSecondSpeedMs).append("\n");
+                props.append(p).append("TWIST_FIRST_SMOOTH=").append(s.animTwistFirstSmooth).append("\n");
+                props.append(p).append("TWIST_SECOND_SMOOTH=").append(s.animTwistSecondSmooth).append("\n");
+                props.append(p).append("TWIST_DIRECTION=").append(s.animTwistDirection).append("\n");
+                props.append(p).append("MORPH_SPEED_MS=").append(s.animMorphSpeedMs).append("\n");
+                props.append(p).append("MORPH_HOLD_MS=").append(s.animMorphHoldMs).append("\n");
+                props.append(p).append("STAY_IN_CANVAS=").append(s.animStayInCanvas).append("\n");
+                props.append(p).append("TWIST_FULL_SPIN=").append(s.animTwistFullSpin).append("\n");
+                props.append(p).append("TWIST_SPREAD_GAP=").append(s.animTwistSpreadGap).append("\n");
+            }
+            byte[] propsBytes = props.toString().getBytes("UTF-8");
+            zos.putNextEntry(new ZipEntry("uft_config.properties"));
+            zos.write(propsBytes);
+            zos.closeEntry();
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, "Save Spriteamation failed: " + ex.getMessage());
             return;
@@ -799,15 +890,18 @@ public class ActionPanel extends JPanel implements ChangeListener {
         File file = chooseFile(true, "sga");
         if (file == null) return;
         java.util.TreeMap<String, byte[]> entries = new java.util.TreeMap<>();
+        byte[] uftConfigData = null;
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(file))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = zis.read(buf)) != -1) baos.write(buf, 0, n);
                 if (entry.getName().endsWith(".svg")) {
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    byte[] buf = new byte[4096];
-                    int n;
-                    while ((n = zis.read(buf)) != -1) baos.write(buf, 0, n);
                     entries.put(entry.getName(), baos.toByteArray());
+                } else if ("uft_config.properties".equals(entry.getName())) {
+                    uftConfigData = baos.toByteArray();
                 }
                 zis.closeEntry();
             }
@@ -840,6 +934,61 @@ public class ActionPanel extends JPanel implements ChangeListener {
             for (int i = 1; i < frames.size(); i++) additional.add(frames.get(i));
             model.setAdditionalFrames(additional);
         }
+        if (uftConfigData != null) {
+            try {
+                Properties p = new Properties();
+                p.load(new ByteArrayInputStream(uftConfigData));
+                int count = intProp(p, "UFT_COUNT", 0);
+                for (int i = 0; i < count && i < model.getFrameCount(); i++) {
+                    String pfx = "UFT_" + i + "_";
+                    TransformSettings s = new TransformSettings();
+                    s.animEffectType       = intProp(p, pfx + "EFFECT_TYPE", 0);
+                    s.animSpread           = intProp(p, pfx + "SPREAD", 24);
+                    s.animSpeedMs          = intProp(p, pfx + "SPEED_MS", 500);
+                    s.animHoldMs           = intProp(p, pfx + "HOLD_MS", 200);
+                    s.animEasing           = intProp(p, pfx + "EASING", 0);
+                    s.animFocalX           = intProp(p, pfx + "FOCAL_X", 50);
+                    s.animFocalY           = intProp(p, pfx + "FOCAL_Y", 50);
+                    s.animSpin             = intProp(p, pfx + "SPIN", 0);
+                    s.animSpinStrength     = intProp(p, pfx + "SPIN_STRENGTH", 100);
+                    s.animExplodeSpeedMs   = intProp(p, pfx + "EXPLODE_SPEED_MS", 1000);
+                    s.animExplodeStrength  = intProp(p, pfx + "EXPLODE_STRENGTH", 100);
+                    s.animUnsplodeSpeedMs  = intProp(p, pfx + "UNSPLODE_SPEED_MS", 1000);
+                    s.animUnsplodeStrength = intProp(p, pfx + "UNSPLODE_STRENGTH", 95);
+                    s.animGravityPush      = intProp(p, pfx + "GRAVITY_PUSH", 50);
+                    s.animGravityPull      = intProp(p, pfx + "GRAVITY_PULL", 50);
+                    s.animGravityFocalX    = intProp(p, pfx + "GRAVITY_FOCAL_X", 50);
+                    s.animGravityFocalY    = intProp(p, pfx + "GRAVITY_FOCAL_Y", 100);
+                    s.animPopHoldMs        = intProp(p, pfx + "POP_HOLD_MS", 0);
+                    s.animExtendMs         = intProp(p, pfx + "EXTEND_MS", 500);
+                    s.animTwistFirstSpeedMs  = intProp(p, pfx + "TWIST_FIRST_SPEED_MS", 300);
+                    s.animTwistSecondSpeedMs = intProp(p, pfx + "TWIST_SECOND_SPEED_MS", 300);
+                    s.animTwistFirstSmooth   = intProp(p, pfx + "TWIST_FIRST_SMOOTH", 50);
+                    s.animTwistSecondSmooth  = intProp(p, pfx + "TWIST_SECOND_SMOOTH", 50);
+                    s.animTwistDirection     = intProp(p, pfx + "TWIST_DIRECTION", 0);
+                    s.animMorphSpeedMs       = intProp(p, pfx + "MORPH_SPEED_MS", 600);
+                    s.animMorphHoldMs        = intProp(p, pfx + "MORPH_HOLD_MS", 300);
+                    s.animStayInCanvas  = boolProp(p, pfx + "STAY_IN_CANVAS", false);
+                    s.animTwistFullSpin = boolProp(p, pfx + "TWIST_FULL_SPIN", true);
+                    s.animTwistSpreadGap = boolProp(p, pfx + "TWIST_SPREAD_GAP", false);
+                    model.setUFTSettings(i, s);
+                    if (boolProp(p, pfx + "ENABLED", false)) model.enableUFT(i);
+                }
+                model.setFullAnimationMode(boolProp(p, "FULL_ANIMATION_MODE", false));
+            } catch (IOException ex) {
+                // Non-fatal: just ignore corrupt UFT config
+            }
+        }
+    }
+
+    private int intProp(Properties p, String key, int def) {
+        try { return Integer.parseInt(p.getProperty(key, String.valueOf(def))); }
+        catch (NumberFormatException e) { return def; }
+    }
+
+    private boolean boolProp(Properties p, String key, boolean def) {
+        String v = p.getProperty(key);
+        return v != null ? Boolean.parseBoolean(v) : def;
     }
 
     private Color[][] parseSvgBytes(byte[] data, String entryName) {

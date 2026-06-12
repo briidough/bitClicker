@@ -3,7 +3,9 @@ package com.atari.spritemaker.model;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -58,9 +60,16 @@ public class SpriteModel {
     private int animMorphHoldMs  = 300;
     private final List<ChangeListener> listeners = new ArrayList<>();
 
+    // Unique Frame Transforms
+    private final List<TransformSettings> uftSettings = new ArrayList<>();
+    private final Set<Integer> uftEnabled = new HashSet<>();
+    private int selectedUFTIndex = -1;
+    private boolean fullAnimationMode = false;
+
     public SpriteModel() {
         animationFrames.add(grid);
         frameBackgrounds.add(null);
+        ensureUFTCapacity();
     }
 
     public int getGridSize() { return gridSize; }
@@ -123,6 +132,11 @@ public class SpriteModel {
         filePath = null;
         bgImage = null;
         showBgImage = true;
+        uftSettings.clear();
+        uftEnabled.clear();
+        selectedUFTIndex = -1;
+        fullAnimationMode = false;
+        ensureUFTCapacity();
         fireChange();
     }
 
@@ -168,6 +182,7 @@ public class SpriteModel {
         currentFrameIndex = animationFrames.size() - 1;
         grid = animationFrames.get(currentFrameIndex);
         bgImage = null;
+        ensureUFTCapacity();
         fireChange();
     }
 
@@ -185,6 +200,7 @@ public class SpriteModel {
             grid = animationFrames.get(0);
             bgImage = frameBackgrounds.get(0);
         }
+        ensureUFTCapacity();
         fireChange();
     }
 
@@ -205,7 +221,7 @@ public class SpriteModel {
     public int getAnimSpinStrength()  { return animSpinStrength; }
     public void setAnimSpinStrength(int v) { animSpinStrength = v; }
     public int getAnimEffectType()        { return animEffectType; }
-    public void setAnimEffectType(int v)  { animEffectType = v; }
+    public void setAnimEffectType(int v)  { if (animEffectType == v) return; animEffectType = v; fireChange(); }
     public int getAnimGravityPush()       { return animGravityPush; }
     public void setAnimGravityPush(int v) { animGravityPush = v; }
     public int getAnimGravityPull()       { return animGravityPull; }
@@ -248,6 +264,97 @@ public class SpriteModel {
     public void setAnimMorphSpeedMs(int v) { if (animMorphSpeedMs == v) return; animMorphSpeedMs = v; fireChange(); }
     public int  getAnimMorphHoldMs()       { return animMorphHoldMs; }
     public void setAnimMorphHoldMs(int v)  { if (animMorphHoldMs == v) return; animMorphHoldMs = v; fireChange(); }
+
+    // ── UFT (Unique Frame Transform) API ─────────────────────────────────────
+
+    public void ensureUFTCapacity() {
+        int N = animationFrames.size();
+        while (uftSettings.size() < N) uftSettings.add(new TransformSettings());
+        while (uftSettings.size() > N) {
+            int last = uftSettings.size() - 1;
+            if (selectedUFTIndex == last) selectedUFTIndex = -1;
+            uftEnabled.remove(last);
+            uftSettings.remove(last);
+        }
+    }
+
+    public void applySettingsSilently(TransformSettings s) {
+        animEffectType       = s.animEffectType;
+        animSpread           = s.animSpread;
+        animSpeedMs          = s.animSpeedMs;
+        animHoldMs           = s.animHoldMs;
+        animEasing           = s.animEasing;
+        animFocalX           = s.animFocalX;
+        animFocalY           = s.animFocalY;
+        animSpin             = s.animSpin;
+        animSpinStrength     = s.animSpinStrength;
+        animExplodeSpeedMs   = s.animExplodeSpeedMs;
+        animExplodeStrength  = s.animExplodeStrength;
+        animUnsplodeSpeedMs  = s.animUnsplodeSpeedMs;
+        animUnsplodeStrength = s.animUnsplodeStrength;
+        animGravityPush      = s.animGravityPush;
+        animGravityPull      = s.animGravityPull;
+        animGravityFocalX    = s.animGravityFocalX;
+        animGravityFocalY    = s.animGravityFocalY;
+        animPopHoldMs        = s.animPopHoldMs;
+        animExtendMs         = s.animExtendMs;
+        animTwistFirstSpeedMs  = s.animTwistFirstSpeedMs;
+        animTwistSecondSpeedMs = s.animTwistSecondSpeedMs;
+        animTwistFirstSmooth   = s.animTwistFirstSmooth;
+        animTwistSecondSmooth  = s.animTwistSecondSmooth;
+        animTwistDirection     = s.animTwistDirection;
+        animMorphSpeedMs       = s.animMorphSpeedMs;
+        animMorphHoldMs        = s.animMorphHoldMs;
+        animStayInCanvas       = s.animStayInCanvas;
+        animTwistFullSpin      = s.animTwistFullSpin;
+        animTwistSpreadGap     = s.animTwistSpreadGap;
+    }
+
+    public void syncSelectedUFT() {
+        if (selectedUFTIndex >= 0 && selectedUFTIndex < uftSettings.size())
+            uftSettings.set(selectedUFTIndex, TransformSettings.capture(this));
+    }
+
+    public void setSelectedUFT(int i) {
+        if (i == selectedUFTIndex) return;
+        syncSelectedUFT();
+        selectedUFTIndex = i;
+        if (i >= 0 && uftEnabled.contains(i))
+            applySettingsSilently(uftSettings.get(i));
+        fireChange();
+    }
+
+    public void toggleUFT(int i) {
+        if (uftEnabled.contains(i)) {
+            uftEnabled.remove(i);
+        } else {
+            uftEnabled.add(i);
+            TransformSettings base = getTransformForTransition(i);
+            uftSettings.set(i, base != null ? base.copy() : TransformSettings.capture(this));
+            if (i == selectedUFTIndex)
+                applySettingsSilently(uftSettings.get(i));
+        }
+        fireChange();
+    }
+
+    public TransformSettings getTransformForTransition(int fromFrame) {
+        int N = animationFrames.size();
+        if (N <= 1) return null;
+        for (int offset = 0; offset < N; offset++) {
+            int slot = ((fromFrame - offset) % N + N) % N;
+            if (uftEnabled.contains(slot)) return uftSettings.get(slot);
+        }
+        return null;
+    }
+
+    public boolean isUFTEnabled(int i)                   { return uftEnabled.contains(i); }
+    public TransformSettings getUFTSettings(int i)       { return uftSettings.get(i); }
+    public void setUFTSettings(int i, TransformSettings s) { uftSettings.set(i, s); }
+    public void enableUFT(int i)                         { uftEnabled.add(i); }
+    public void disableUFT(int i)                        { uftEnabled.remove(i); }
+    public int  getSelectedUFTIndex()                    { return selectedUFTIndex; }
+    public boolean isFullAnimationMode()                 { return fullAnimationMode; }
+    public void setFullAnimationMode(boolean v)          { if (fullAnimationMode == v) return; fullAnimationMode = v; fireChange(); }
 
     public void addChangeListener(ChangeListener l) { listeners.add(l); }
 

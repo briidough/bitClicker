@@ -1,0 +1,103 @@
+package com.atari.spritemaker.model;
+
+public class TransformSettings {
+    public int animEffectType       = 0;
+    public int animSpread           = 24;
+    public int animSpeedMs          = 500;
+    public int animHoldMs           = 200;
+    public int animEasing           = 0;
+    public int animFocalX           = 50;
+    public int animFocalY           = 50;
+    public int animSpin             = 0;
+    public int animSpinStrength     = 100;
+    public int animExplodeSpeedMs   = 1000;
+    public int animExplodeStrength  = 100;
+    public int animUnsplodeSpeedMs  = 1000;
+    public int animUnsplodeStrength = 95;
+    public int animGravityPush      = 50;
+    public int animGravityPull      = 50;
+    public int animGravityFocalX    = 50;
+    public int animGravityFocalY    = 100;
+    public int animPopHoldMs        = 0;
+    public int animExtendMs         = 500;
+    public int animTwistFirstSpeedMs  = 300;
+    public int animTwistSecondSpeedMs = 300;
+    public int animTwistFirstSmooth   = 50;
+    public int animTwistSecondSmooth  = 50;
+    public int animTwistDirection     = 0;
+    public int animMorphSpeedMs       = 600;
+    public int animMorphHoldMs        = 300;
+    public boolean animStayInCanvas  = false;
+    public boolean animTwistFullSpin = true;
+    public boolean animTwistSpreadGap = false;
+
+    public TransformSettings() {}
+
+    public static TransformSettings capture(SpriteModel m) {
+        TransformSettings s = new TransformSettings();
+        s.animEffectType       = m.getAnimEffectType();
+        s.animSpread           = m.getAnimSpread();
+        s.animSpeedMs          = m.getAnimSpeedMs();
+        s.animHoldMs           = m.getAnimHoldMs();
+        s.animEasing           = m.getAnimEasing();
+        s.animFocalX           = m.getAnimFocalX();
+        s.animFocalY           = m.getAnimFocalY();
+        s.animSpin             = m.getAnimSpin();
+        s.animSpinStrength     = m.getAnimSpinStrength();
+        s.animExplodeSpeedMs   = m.getAnimExplodeSpeedMs();
+        s.animExplodeStrength  = m.getAnimExplodeStrength();
+        s.animUnsplodeSpeedMs  = m.getAnimUnsplodeSpeedMs();
+        s.animUnsplodeStrength = m.getAnimUnsplodeStrength();
+        s.animGravityPush      = m.getAnimGravityPush();
+        s.animGravityPull      = m.getAnimGravityPull();
+        s.animGravityFocalX    = m.getAnimGravityFocalX();
+        s.animGravityFocalY    = m.getAnimGravityFocalY();
+        s.animPopHoldMs        = m.getAnimPopHoldMs();
+        s.animExtendMs         = m.getAnimExtendMs();
+        s.animTwistFirstSpeedMs  = m.getAnimTwistFirstSpeedMs();
+        s.animTwistSecondSpeedMs = m.getAnimTwistSecondSpeedMs();
+        s.animTwistFirstSmooth   = m.getAnimTwistFirstSmooth();
+        s.animTwistSecondSmooth  = m.getAnimTwistSecondSmooth();
+        s.animTwistDirection     = m.getAnimTwistDirection();
+        s.animMorphSpeedMs       = m.getAnimMorphSpeedMs();
+        s.animMorphHoldMs        = m.getAnimMorphHoldMs();
+        s.animStayInCanvas       = m.isAnimStayInCanvas();
+        s.animTwistFullSpin      = m.isAnimTwistFullSpin();
+        s.animTwistSpreadGap     = m.isAnimTwistSpreadGap();
+        return s;
+    }
+
+    public TransformSettings copy() {
+        TransformSettings s = new TransformSettings();
+        s.animEffectType       = animEffectType;
+        s.animSpread           = animSpread;
+        s.animSpeedMs          = animSpeedMs;
+        s.animHoldMs           = animHoldMs;
+        s.animEasing           = animEasing;
+        s.animFocalX           = animFocalX;
+        s.animFocalY           = animFocalY;
+        s.animSpin             = animSpin;
+        s.animSpinStrength     = animSpinStrength;
+        s.animExplodeSpeedMs   = animExplodeSpeedMs;
+        s.animExplodeStrength  = animExplodeStrength;
+        s.animUnsplodeSpeedMs  = animUnsplodeSpeedMs;
+        s.animUnsplodeStrength = animUnsplodeStrength;
+        s.animGravityPush      = animGravityPush;
+        s.animGravityPull      = animGravityPull;
+        s.animGravityFocalX    = animGravityFocalX;
+        s.animGravityFocalY    = animGravityFocalY;
+        s.animPopHoldMs        = animPopHoldMs;
+        s.animExtendMs         = animExtendMs;
+        s.animTwistFirstSpeedMs  = animTwistFirstSpeedMs;
+        s.animTwistSecondSpeedMs = animTwistSecondSpeedMs;
+        s.animTwistFirstSmooth   = animTwistFirstSmooth;
+        s.animTwistSecondSmooth  = animTwistSecondSmooth;
+        s.animTwistDirection     = animTwistDirection;
+        s.animMorphSpeedMs       = animMorphSpeedMs;
+        s.animMorphHoldMs        = animMorphHoldMs;
+        s.animStayInCanvas       = animStayInCanvas;
+        s.animTwistFullSpin      = animTwistFullSpin;
+        s.animTwistSpreadGap     = animTwistSpreadGap;
+        return s;
+    }
+}

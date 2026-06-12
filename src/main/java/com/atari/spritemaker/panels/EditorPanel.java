@@ -239,41 +239,136 @@ public class EditorPanel extends JPanel implements ChangeListener {
         }
     }
 
+    private class UftTabButton extends JPanel {
+        private static final Color ENABLED_COLOR  = new Color(60, 100, 180);
+        private static final Color SELECTED_COLOR = new Color(210, 220, 255);
+
+        private boolean selected = false;
+        private boolean enabled  = false;
+        private final int idx;
+
+        UftTabButton(int idx) {
+            this.idx = idx;
+            setPreferredSize(new Dimension(28, 22));
+            setOpaque(true);
+            setBorder(BorderFactory.createLineBorder(Color.GRAY));
+            setToolTipText("UFT " + (idx + 1) + "→" + (idx + 2));
+
+            addMouseListener(new MouseAdapter() {
+                @Override public void mousePressed(MouseEvent e) {
+                    int halfH = getHeight() / 2;
+                    if (e.getY() < halfH) {
+                        int cur = model.getSelectedUFTIndex();
+                        if (cur == idx) model.setSelectedUFT(-1);
+                        else            model.setSelectedUFT(idx);
+                    } else {
+                        model.toggleUFT(idx);
+                    }
+                }
+            });
+        }
+
+        void setUFTSelected(boolean sel) { selected = sel; repaint(); }
+        void setUFTEnabled(boolean en)   { enabled  = en;  repaint(); }
+
+        @Override protected void paintComponent(Graphics g) {
+            Color defBg = UIManager.getColor("Button.background");
+            if (defBg == null) defBg = new Color(238, 238, 238);
+            int w = getWidth(), h = getHeight(), half = h / 2;
+            g.setColor(selected ? SELECTED_COLOR : defBg);
+            g.fillRect(0, 0, w, half);
+            g.setColor(enabled ? ENABLED_COLOR : defBg);
+            g.fillRect(0, half, w, h - half);
+            g.setColor(Color.GRAY);
+            g.drawLine(0, half, w, half);
+            g.setColor(Color.DARK_GRAY);
+            FontMetrics fm = g.getFontMetrics();
+            String txt = "→";
+            int tx = (w - fm.stringWidth(txt)) / 2;
+            int ty = half / 2 + fm.getAscent() / 2;
+            g.drawString(txt, tx, ty);
+        }
+    }
+
     private class FrameTabBar extends JPanel {
         private static final int MAX_FRAMES = 6;
+
         private final List<JToggleButton> tabBtns = new ArrayList<>();
+        private final List<UftTabButton>  uftBtns = new ArrayList<>();
         private final ButtonGroup tabGroup = new ButtonGroup();
+        private final JToggleButton allBtn;
         private final JButton addBtn;
 
         FrameTabBar() {
             setLayout(new FlowLayout(FlowLayout.LEFT, 2, 2));
+
+            allBtn = new JToggleButton("►");
+            allBtn.setPreferredSize(new Dimension(32, 22));
+            allBtn.setMargin(new Insets(1, 2, 1, 2));
+            allBtn.setToolTipText("Full animation");
+            allBtn.addActionListener(e -> { model.setSelectedUFT(-1); model.setFullAnimationMode(true); });
+            tabGroup.add(allBtn);
+
             for (int i = 0; i < MAX_FRAMES; i++) {
                 final int idx = i;
                 JToggleButton btn = new JToggleButton(String.valueOf(i + 1));
                 btn.setPreferredSize(new Dimension(32, 22));
                 btn.setMargin(new Insets(1, 2, 1, 2));
-                btn.addActionListener(e -> model.switchToFrame(idx));
+                btn.addActionListener(e -> {
+                    model.setSelectedUFT(-1);
+                    model.setFullAnimationMode(false);
+                    model.switchToFrame(idx);
+                });
                 tabGroup.add(btn);
                 tabBtns.add(btn);
-                add(btn);
+
+                uftBtns.add(new UftTabButton(i));
             }
+
             addBtn = new JButton("+");
             addBtn.setPreferredSize(new Dimension(28, 22));
             addBtn.setMargin(new Insets(1, 2, 1, 2));
             addBtn.addActionListener(e -> model.addFrame());
-            add(addBtn);
+
             refresh();
         }
 
         void refresh() {
-            int frameCount = model.getFrameCount();
-            int current = model.getCurrentFrameIndex();
-            for (int i = 0; i < MAX_FRAMES; i++) {
-                JToggleButton btn = tabBtns.get(i);
-                btn.setVisible(i < frameCount);
-                btn.setSelected(i == current);
+            removeAll();
+            boolean isTransform = model.getMode() == Mode.TRANSFORM;
+            int N = model.getFrameCount();
+            int selectedUFT = model.getSelectedUFTIndex();
+            boolean fullAnim = model.isFullAnimationMode();
+            int currentFrame = model.getCurrentFrameIndex();
+
+            if (isTransform) add(allBtn);
+
+            for (int i = 0; i < N; i++) {
+                add(tabBtns.get(i));
+                if (isTransform) {
+                    UftTabButton uft = uftBtns.get(i);
+                    uft.setUFTSelected(i == selectedUFT);
+                    uft.setUFTEnabled(model.isUFTEnabled(i));
+                    int next = (i + 1) % N;
+                    uft.setToolTipText("UFT " + (i + 1) + "→" + (next + 1));
+                    add(uft);
+                }
             }
-            addBtn.setVisible(frameCount < MAX_FRAMES);
+
+            if (!isTransform) {
+                if (N < MAX_FRAMES) add(addBtn);
+            }
+
+            // Sync ButtonGroup selection
+            if (isTransform && selectedUFT >= 0) {
+                tabGroup.clearSelection();
+            } else if (isTransform && fullAnim) {
+                tabGroup.setSelected(allBtn.getModel(), true);
+            } else {
+                int sel = Math.min(currentFrame, N - 1);
+                tabGroup.setSelected(tabBtns.get(sel).getModel(), true);
+            }
+
             revalidate();
             repaint();
         }

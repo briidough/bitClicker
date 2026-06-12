@@ -45,3 +45,10 @@ All three panels implement `ChangeListener` and are registered on `SpriteModel`.
 2. User clicks a palette slot → `SpriteModel.selectPaletteSlot(i)` — toggles selection; sets `activeColor` to that slot's color, or resets to black if already selected.
 3. User clicks a color swatch → `SpriteModel.setPaletteSlotColor(selectedSlot, color)` — only works when a slot is selected.
 4. User clicks/drags on the grid → `SpriteModel.setCellColor(row, col, activeColor)` — only paints if cell color differs from active color.
+
+
+## Brendan's wishes
+
+1. Don't check in to Git or run the app, I will. Please compile it though.
+2. Update the pixel-transforms.txt when updates are made to pixel transforms.
+3. Add to and update a README.txt Make it very simple with instructions to run on Win/Mac/Lin
