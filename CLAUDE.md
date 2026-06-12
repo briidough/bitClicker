@@ -10,8 +10,9 @@ Maven is **not installed** on this machine. Use `javac` and `jar` directly.
 # Compile
 find src -name "*.java" | sort | xargs $JAVA_HOME/bin/javac -d out
 
-# Package
-$JAVA_HOME/bin/jar cfe sprite-editor.jar com.atari.spritemaker.Main -C out .
+# Package — $JAVA_HOME/bin/jar does NOT work inside the Flatpak sandbox.
+# Use flatpak-spawn to reach the host jar binary:
+flatpak-spawn --host /usr/bin/jar cfe sprite-editor.jar com.atari.spritemaker.Main -C out .
 
 # Run
 $JAVA_HOME/bin/java -jar sprite-editor.jar

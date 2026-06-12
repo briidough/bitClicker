@@ -27,9 +27,12 @@ public class TransformSettings {
     public int animTwistDirection     = 0;
     public int animMorphSpeedMs       = 600;
     public int animMorphHoldMs        = 300;
-    public boolean animStayInCanvas  = false;
-    public boolean animTwistFullSpin = true;
-    public boolean animTwistSpreadGap = false;
+    public boolean animStayInCanvas    = false;
+    public boolean animTwistFullSpin   = true;
+    public boolean animTwistSpreadGap  = false;
+    public boolean animMorphFadeDeaths = false;
+    public boolean animPopStayAtFocus  = false;
+    public int     animWallDamping     = 50;
 
     public TransformSettings() {}
 
@@ -64,6 +67,9 @@ public class TransformSettings {
         s.animStayInCanvas       = m.isAnimStayInCanvas();
         s.animTwistFullSpin      = m.isAnimTwistFullSpin();
         s.animTwistSpreadGap     = m.isAnimTwistSpreadGap();
+        s.animMorphFadeDeaths    = m.isAnimMorphFadeDeaths();
+        s.animPopStayAtFocus     = m.isAnimPopStayAtFocus();
+        s.animWallDamping        = m.getAnimWallDamping();
         return s;
     }
 
@@ -98,6 +104,9 @@ public class TransformSettings {
         s.animStayInCanvas       = animStayInCanvas;
         s.animTwistFullSpin      = animTwistFullSpin;
         s.animTwistSpreadGap     = animTwistSpreadGap;
+        s.animMorphFadeDeaths    = animMorphFadeDeaths;
+        s.animPopStayAtFocus     = animPopStayAtFocus;
+        s.animWallDamping        = animWallDamping;
         return s;
     }
 }

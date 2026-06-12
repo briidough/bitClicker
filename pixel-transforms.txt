@@ -15,12 +15,31 @@ Optional focal point X/Y sliders let you bias the explosion origin anywhere in t
 A two-phase explode/unsplode effect with per-pixel randomized speeds and gravity.
 Explode phase: pixels scatter outward with individual speed variance (Gravity Push controls spread),
 while a separate gravity target (Gravity Pull + focal X/Y) bends all trajectories toward a point.
-An optional Extend phase continues the outward travel past the explode peak, held in place for
-Extend Duration ms before release.
+Extend Duration continues outward travel past the explode peak using the same physics (per-pixel speeds,
+gravity pull, easing) — the radial push stays frozen at peak while gravity keeps accumulating, so the
+extend phase feels like a seamless continuation of the explode rather than a new linear drift.
 A configurable Delay holds pixels at their furthest position before the snap-back begins.
 Unsplode phase: pixels return to their destination with a snappy two-stage pull — slow glide until
 the Unsplode Strength threshold, then a rapid magnetic snap to the final position.
-Stay in Canvas clamps all pixels to the canvas boundary during flight.
+Stay in Canvas keeps pixels inside the canvas boundary. Wall Bounce % (0–100) controls how much
+velocity is retained on each wall hit — 0 absorbs all energy (soft stop), 100 is elastic (full bounce),
+default 50. Pixels can bounce up to 3 times per frame before a hard clamp.
+Stay at Focus toggles a black-hole attraction toward the Gravity Target focal point. The pull force
+scales with proximity squared (much stronger near the center) and uses Gravity Pull as its base
+strength, so it competes with the outward explode force throughout the entire animation — creating
+orbit, spiral, or condensed-scatter effects depending on relative strengths.
+
+--- PIXEL MORPH ---
+Smoothly transitions pixel-by-pixel from one frame to the next using three categories:
+Stable pixels (same color in both frames) render immediately at full opacity.
+Birth pixels (new in destination frame) slide in from nearby stable neighbors in a wave that
+ripples outward from the stable region — closer births arrive earlier.
+Death pixels (present in source frame but gone in destination) shrink centered from full cell size
+to nothing over the animation duration. With Fade Dying Pixels enabled, dying pixels also fade
+their alpha from fully opaque to transparent simultaneously with the shrink, creating a combined
+dissolve+shrink effect. Without it, pixels shrink sharply with hard edges.
+Speed (ms) and Hold (ms) control animation duration and the pause between transitions.
+The Focal Point X/Y sliders bias where the birth wave originates.
 
 --- PIXEL TWIST ---
 Each pixel rotates in place around its center, clockwise or counter-clockwise, across two independent half-turns.

@@ -12,6 +12,9 @@ public class PixelMorphPanel extends JPanel {
     private final JSlider sliderMorphHold;
     private final JSlider sliderFocalX;
     private final JSlider sliderFocalY;
+    private final JCheckBox chkFadeDeaths;
+
+    private boolean updating = false;
 
     public PixelMorphPanel(SpriteModel model) {
         this.model = model;
@@ -20,12 +23,12 @@ public class PixelMorphPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         sliderMorphSpeed = new JSlider(AnimConfig.MORPH_SPEED_MIN, AnimConfig.MORPH_SPEED_MAX, model.getAnimMorphSpeedMs());
-        sliderMorphSpeed.addChangeListener(e -> model.setAnimMorphSpeedMs(sliderMorphSpeed.getValue()));
+        sliderMorphSpeed.addChangeListener(e -> { if (!updating) model.setAnimMorphSpeedMs(sliderMorphSpeed.getValue()); });
         add(wrapSlider("Speed (ms)", sliderMorphSpeed));
 
         add(Box.createVerticalStrut(6));
         sliderMorphHold = new JSlider(AnimConfig.MORPH_HOLD_MIN, AnimConfig.MORPH_HOLD_MAX, model.getAnimMorphHoldMs());
-        sliderMorphHold.addChangeListener(e -> model.setAnimMorphHoldMs(sliderMorphHold.getValue()));
+        sliderMorphHold.addChangeListener(e -> { if (!updating) model.setAnimMorphHoldMs(sliderMorphHold.getValue()); });
         add(wrapSlider("Hold (ms)", sliderMorphHold));
 
         add(Box.createVerticalStrut(12));
@@ -35,13 +38,21 @@ public class PixelMorphPanel extends JPanel {
         add(Box.createVerticalStrut(4));
 
         sliderFocalX = new JSlider(AnimConfig.BURST_FOCAL_X_MIN, AnimConfig.BURST_FOCAL_X_MAX, model.getAnimFocalX());
-        sliderFocalX.addChangeListener(e -> model.setAnimFocalX(sliderFocalX.getValue()));
+        sliderFocalX.addChangeListener(e -> { if (!updating) model.setAnimFocalX(sliderFocalX.getValue()); });
         add(wrapSlider("X %", sliderFocalX));
 
         add(Box.createVerticalStrut(4));
         sliderFocalY = new JSlider(AnimConfig.BURST_FOCAL_Y_MIN, AnimConfig.BURST_FOCAL_Y_MAX, model.getAnimFocalY());
-        sliderFocalY.addChangeListener(e -> model.setAnimFocalY(sliderFocalY.getValue()));
+        sliderFocalY.addChangeListener(e -> { if (!updating) model.setAnimFocalY(sliderFocalY.getValue()); });
         add(wrapSlider("Y %", sliderFocalY));
+
+        add(Box.createVerticalStrut(6));
+        chkFadeDeaths = new JCheckBox("Fade Dying Pixels");
+        chkFadeDeaths.setSelected(model.isAnimMorphFadeDeaths());
+        chkFadeDeaths.setAlignmentX(Component.LEFT_ALIGNMENT);
+        chkFadeDeaths.setMaximumSize(new Dimension(Integer.MAX_VALUE, chkFadeDeaths.getPreferredSize().height));
+        chkFadeDeaths.addActionListener(e -> { if (!updating) model.setAnimMorphFadeDeaths(chkFadeDeaths.isSelected()); });
+        add(chkFadeDeaths);
 
         add(Box.createVerticalStrut(12));
         JButton resetBtn = new JButton("Reset Defaults");
@@ -49,6 +60,16 @@ public class PixelMorphPanel extends JPanel {
         resetBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         resetBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, resetBtn.getPreferredSize().height));
         add(resetBtn);
+    }
+
+    public void refresh() {
+        updating = true;
+        sliderMorphSpeed.setValue(model.getAnimMorphSpeedMs());
+        sliderMorphHold.setValue(model.getAnimMorphHoldMs());
+        sliderFocalX.setValue(model.getAnimFocalX());
+        sliderFocalY.setValue(model.getAnimFocalY());
+        chkFadeDeaths.setSelected(model.isAnimMorphFadeDeaths());
+        updating = false;
     }
 
     public void resetDefaults() {

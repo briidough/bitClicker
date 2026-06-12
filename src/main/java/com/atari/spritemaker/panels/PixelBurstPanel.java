@@ -12,6 +12,9 @@ public class PixelBurstPanel extends JPanel {
     private final JSlider sliderSpread, sliderSpeed, sliderHold;
     private final JSlider sliderFocalX, sliderFocalY, sliderSpinStrength;
     private final JComboBox<String> comboEasing, comboSpin;
+    private final JPanel spinStrengthSection;
+
+    private boolean updating = false;
 
     public PixelBurstPanel(SpriteModel model) {
         this.model = model;
@@ -20,17 +23,17 @@ public class PixelBurstPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         sliderSpread = new JSlider(AnimConfig.BURST_SPREAD_MIN, AnimConfig.BURST_SPREAD_MAX, model.getAnimSpread());
-        sliderSpread.addChangeListener(e -> model.setAnimSpread(sliderSpread.getValue()));
+        sliderSpread.addChangeListener(e -> { if (!updating) model.setAnimSpread(sliderSpread.getValue()); });
         add(wrapSlider("Spread", sliderSpread));
 
         add(Box.createVerticalStrut(6));
         sliderSpeed = new JSlider(AnimConfig.BURST_SPEED_MIN, AnimConfig.BURST_SPEED_MAX, model.getAnimSpeedMs());
-        sliderSpeed.addChangeListener(e -> model.setAnimSpeedMs(sliderSpeed.getValue()));
+        sliderSpeed.addChangeListener(e -> { if (!updating) model.setAnimSpeedMs(sliderSpeed.getValue()); });
         add(wrapSlider("Speed (ms)", sliderSpeed));
 
         add(Box.createVerticalStrut(6));
         sliderHold = new JSlider(AnimConfig.BURST_HOLD_MIN, AnimConfig.BURST_HOLD_MAX, model.getAnimHoldMs());
-        sliderHold.addChangeListener(e -> model.setAnimHoldMs(sliderHold.getValue()));
+        sliderHold.addChangeListener(e -> { if (!updating) model.setAnimHoldMs(sliderHold.getValue()); });
         add(wrapSlider("Hold (ms)", sliderHold));
 
         add(Box.createVerticalStrut(8));
@@ -42,7 +45,7 @@ public class PixelBurstPanel extends JPanel {
         comboEasing.setSelectedIndex(model.getAnimEasing());
         comboEasing.setAlignmentX(Component.LEFT_ALIGNMENT);
         comboEasing.setMaximumSize(new Dimension(Integer.MAX_VALUE, comboEasing.getPreferredSize().height));
-        comboEasing.addActionListener(e -> model.setAnimEasing(comboEasing.getSelectedIndex()));
+        comboEasing.addActionListener(e -> { if (!updating) model.setAnimEasing(comboEasing.getSelectedIndex()); });
         add(comboEasing);
 
         add(Box.createVerticalStrut(12));
@@ -52,7 +55,7 @@ public class PixelBurstPanel extends JPanel {
         add(Box.createVerticalStrut(4));
 
         sliderFocalX = new JSlider(AnimConfig.BURST_FOCAL_X_MIN, AnimConfig.BURST_FOCAL_X_MAX, model.getAnimFocalX());
-        sliderFocalX.addChangeListener(e -> model.setAnimFocalX(sliderFocalX.getValue()));
+        sliderFocalX.addChangeListener(e -> { if (!updating) model.setAnimFocalX(sliderFocalX.getValue()); });
         MouseAdapter focalDragTracker = new MouseAdapter() {
             public void mousePressed(MouseEvent e)  { model.setFocalActive(true); }
             public void mouseReleased(MouseEvent e) { model.setFocalActive(false); }
@@ -62,7 +65,7 @@ public class PixelBurstPanel extends JPanel {
 
         add(Box.createVerticalStrut(4));
         sliderFocalY = new JSlider(AnimConfig.BURST_FOCAL_Y_MIN, AnimConfig.BURST_FOCAL_Y_MAX, model.getAnimFocalY());
-        sliderFocalY.addChangeListener(e -> model.setAnimFocalY(sliderFocalY.getValue()));
+        sliderFocalY.addChangeListener(e -> { if (!updating) model.setAnimFocalY(sliderFocalY.getValue()); });
         sliderFocalY.addMouseListener(focalDragTracker);
         add(wrapSlider("Y %", sliderFocalY));
 
@@ -78,8 +81,8 @@ public class PixelBurstPanel extends JPanel {
         add(comboSpin);
 
         sliderSpinStrength = new JSlider(AnimConfig.BURST_SPIN_STRENGTH_MIN, AnimConfig.BURST_SPIN_STRENGTH_MAX, model.getAnimSpinStrength());
-        sliderSpinStrength.addChangeListener(e -> model.setAnimSpinStrength(sliderSpinStrength.getValue()));
-        JPanel spinStrengthSection = new JPanel();
+        sliderSpinStrength.addChangeListener(e -> { if (!updating) model.setAnimSpinStrength(sliderSpinStrength.getValue()); });
+        spinStrengthSection = new JPanel();
         spinStrengthSection.setLayout(new BoxLayout(spinStrengthSection, BoxLayout.Y_AXIS));
         spinStrengthSection.setAlignmentX(Component.LEFT_ALIGNMENT);
         spinStrengthSection.add(Box.createVerticalStrut(6));
@@ -88,7 +91,7 @@ public class PixelBurstPanel extends JPanel {
         add(spinStrengthSection);
 
         comboSpin.addActionListener(e -> {
-            model.setAnimSpin(comboSpin.getSelectedIndex());
+            if (!updating) model.setAnimSpin(comboSpin.getSelectedIndex());
             spinStrengthSection.setVisible(comboSpin.getSelectedIndex() != 0);
             revalidate();
             repaint();
@@ -100,6 +103,22 @@ public class PixelBurstPanel extends JPanel {
         resetBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         resetBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, resetBtn.getPreferredSize().height));
         add(resetBtn);
+    }
+
+    public void refresh() {
+        updating = true;
+        sliderSpread.setValue(model.getAnimSpread());
+        sliderSpeed.setValue(model.getAnimSpeedMs());
+        sliderHold.setValue(model.getAnimHoldMs());
+        comboEasing.setSelectedIndex(model.getAnimEasing());
+        sliderFocalX.setValue(model.getAnimFocalX());
+        sliderFocalY.setValue(model.getAnimFocalY());
+        comboSpin.setSelectedIndex(model.getAnimSpin());
+        sliderSpinStrength.setValue(model.getAnimSpinStrength());
+        spinStrengthSection.setVisible(model.getAnimSpin() != 0);
+        updating = false;
+        revalidate();
+        repaint();
     }
 
     public void resetDefaults() {

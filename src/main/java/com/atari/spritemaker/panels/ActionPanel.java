@@ -300,13 +300,18 @@ public class ActionPanel extends JPanel implements ChangeListener {
                 btnPop  .setSelected(t == 1);
                 btnTwist.setSelected(t == 2);
                 btnMorph.setSelected(t == 3);
-                if (actionEditsPanel != null && !actionEditsPanel.isVisible()) {
+                if (actionEditsPanel != null) {
                     String key = t == 1 ? "pop" : t == 2 ? "twist" : t == 3 ? "morph" : "burst";
-                    actionEditsPanel.showTransformMode(key);
+                    if (!actionEditsPanel.isVisible()) actionEditsPanel.showTransformMode(key);
+                    else actionEditsPanel.syncTransformCard();
                 }
             } else {
-                effectGroup.clearSelection();
-                if (actionEditsPanel != null) actionEditsPanel.setVisible(false);
+                // Global animation mode — sync effect buttons but don't touch panel visibility
+                int t = model.getAnimEffectType();
+                btnBurst.setSelected(t == 0);
+                btnPop  .setSelected(t == 1);
+                btnTwist.setSelected(t == 2);
+                btnMorph.setSelected(t == 3);
             }
 
             if (uftLabel != null) {

@@ -56,9 +56,13 @@ public class SpriteModel {
     private int     animTwistDirection     = 0;
     private boolean animTwistFullSpin      = true;
     private boolean animTwistSpreadGap     = false;
+    private boolean animMorphFadeDeaths    = false;
+    private boolean animPopStayAtFocus     = false;
+    private int     animWallDamping        = 50;
     private int animMorphSpeedMs = 600;
     private int animMorphHoldMs  = 300;
     private final List<ChangeListener> listeners = new ArrayList<>();
+    private final List<Runnable> transformListeners = new ArrayList<>();
 
     // Unique Frame Transforms
     private final List<TransformSettings> uftSettings = new ArrayList<>();
@@ -136,6 +140,7 @@ public class SpriteModel {
         uftEnabled.clear();
         selectedUFTIndex = -1;
         fullAnimationMode = false;
+        applySettingsSilently(new TransformSettings());
         ensureUFTCapacity();
         fireChange();
     }
@@ -205,65 +210,71 @@ public class SpriteModel {
     }
 
     public int getAnimSpread()   { return animSpread; }
-    public void setAnimSpread(int v)  { animSpread = v; }
+    public void setAnimSpread(int v)  { animSpread = v; fireTransformChange(); }
     public int getAnimSpeedMs()  { return animSpeedMs; }
-    public void setAnimSpeedMs(int v) { animSpeedMs = v; }
+    public void setAnimSpeedMs(int v) { animSpeedMs = v; fireTransformChange(); }
     public int getAnimHoldMs()   { return animHoldMs; }
-    public void setAnimHoldMs(int v)  { animHoldMs = v; }
+    public void setAnimHoldMs(int v)  { animHoldMs = v; fireTransformChange(); }
     public int getAnimEasing()   { return animEasing; }
-    public void setAnimEasing(int v)  { animEasing = v; }
+    public void setAnimEasing(int v)  { animEasing = v; fireTransformChange(); }
     public int getAnimFocalX()   { return animFocalX; }
-    public void setAnimFocalX(int v)  { if (animFocalX == v) return; animFocalX = v; fireChange(); }
+    public void setAnimFocalX(int v)  { if (animFocalX == v) return; animFocalX = v; fireChange(); fireTransformChange(); }
     public int getAnimFocalY()   { return animFocalY; }
-    public void setAnimFocalY(int v)  { if (animFocalY == v) return; animFocalY = v; fireChange(); }
+    public void setAnimFocalY(int v)  { if (animFocalY == v) return; animFocalY = v; fireChange(); fireTransformChange(); }
     public int getAnimSpin()     { return animSpin; }
-    public void setAnimSpin(int v)    { animSpin = v; }
+    public void setAnimSpin(int v)    { animSpin = v; fireTransformChange(); }
     public int getAnimSpinStrength()  { return animSpinStrength; }
-    public void setAnimSpinStrength(int v) { animSpinStrength = v; }
+    public void setAnimSpinStrength(int v) { animSpinStrength = v; fireTransformChange(); }
     public int getAnimEffectType()        { return animEffectType; }
-    public void setAnimEffectType(int v)  { if (animEffectType == v) return; animEffectType = v; fireChange(); }
+    public void setAnimEffectType(int v)  { if (animEffectType == v) return; animEffectType = v; fireChange(); fireTransformChange(); }
     public int getAnimGravityPush()       { return animGravityPush; }
-    public void setAnimGravityPush(int v) { animGravityPush = v; }
+    public void setAnimGravityPush(int v) { animGravityPush = v; fireTransformChange(); }
     public int getAnimGravityPull()       { return animGravityPull; }
-    public void setAnimGravityPull(int v) { animGravityPull = v; }
+    public void setAnimGravityPull(int v) { animGravityPull = v; fireTransformChange(); }
     public int getAnimGravityFocalX()        { return animGravityFocalX; }
-    public void setAnimGravityFocalX(int v)  { if (animGravityFocalX == v) return; animGravityFocalX = v; fireChange(); }
+    public void setAnimGravityFocalX(int v)  { if (animGravityFocalX == v) return; animGravityFocalX = v; fireChange(); fireTransformChange(); }
     public int getAnimGravityFocalY()        { return animGravityFocalY; }
-    public void setAnimGravityFocalY(int v)  { if (animGravityFocalY == v) return; animGravityFocalY = v; fireChange(); }
+    public void setAnimGravityFocalY(int v)  { if (animGravityFocalY == v) return; animGravityFocalY = v; fireChange(); fireTransformChange(); }
     public int getAnimExplodeSpeedMs()           { return animExplodeSpeedMs; }
-    public void setAnimExplodeSpeedMs(int v)     { animExplodeSpeedMs = v; }
+    public void setAnimExplodeSpeedMs(int v)     { animExplodeSpeedMs = v; fireTransformChange(); }
     public int getAnimUnsplodeSpeedMs()          { return animUnsplodeSpeedMs; }
-    public void setAnimUnsplodeSpeedMs(int v)    { animUnsplodeSpeedMs = v; }
+    public void setAnimUnsplodeSpeedMs(int v)    { animUnsplodeSpeedMs = v; fireTransformChange(); }
     public int getAnimExplodeStrength()          { return animExplodeStrength; }
-    public void setAnimExplodeStrength(int v)    { animExplodeStrength = v; }
+    public void setAnimExplodeStrength(int v)    { animExplodeStrength = v; fireTransformChange(); }
     public int getAnimUnsplodeStrength()         { return animUnsplodeStrength; }
-    public void setAnimUnsplodeStrength(int v)   { animUnsplodeStrength = v; }
+    public void setAnimUnsplodeStrength(int v)   { animUnsplodeStrength = v; fireTransformChange(); }
     public boolean isAnimStayInCanvas()          { return animStayInCanvas; }
-    public void setAnimStayInCanvas(boolean v)   { animStayInCanvas = v; }
+    public void setAnimStayInCanvas(boolean v)   { animStayInCanvas = v; fireTransformChange(); }
     public int getAnimPopHoldMs()                { return animPopHoldMs; }
-    public void setAnimPopHoldMs(int v)          { animPopHoldMs = v; }
+    public void setAnimPopHoldMs(int v)          { animPopHoldMs = v; fireTransformChange(); }
     public int getAnimExtendMs()                 { return animExtendMs; }
-    public void setAnimExtendMs(int v)           { animExtendMs = v; }
+    public void setAnimExtendMs(int v)           { animExtendMs = v; fireTransformChange(); }
     public boolean isFocalActive()    { return focalActive; }
     public void setFocalActive(boolean v) { if (focalActive == v) return; focalActive = v; fireChange(); }
     public int  getAnimTwistFirstSpeedMs()          { return animTwistFirstSpeedMs; }
-    public void setAnimTwistFirstSpeedMs(int v)     { animTwistFirstSpeedMs = v; }
+    public void setAnimTwistFirstSpeedMs(int v)     { animTwistFirstSpeedMs = v; fireTransformChange(); }
     public int  getAnimTwistSecondSpeedMs()         { return animTwistSecondSpeedMs; }
-    public void setAnimTwistSecondSpeedMs(int v)    { animTwistSecondSpeedMs = v; }
+    public void setAnimTwistSecondSpeedMs(int v)    { animTwistSecondSpeedMs = v; fireTransformChange(); }
     public int  getAnimTwistFirstSmooth()           { return animTwistFirstSmooth; }
-    public void setAnimTwistFirstSmooth(int v)      { animTwistFirstSmooth = v; }
+    public void setAnimTwistFirstSmooth(int v)      { animTwistFirstSmooth = v; fireTransformChange(); }
     public int  getAnimTwistSecondSmooth()          { return animTwistSecondSmooth; }
-    public void setAnimTwistSecondSmooth(int v)     { animTwistSecondSmooth = v; }
+    public void setAnimTwistSecondSmooth(int v)     { animTwistSecondSmooth = v; fireTransformChange(); }
     public int  getAnimTwistDirection()             { return animTwistDirection; }
-    public void setAnimTwistDirection(int v)        { animTwistDirection = v; }
+    public void setAnimTwistDirection(int v)        { animTwistDirection = v; fireTransformChange(); }
     public boolean isAnimTwistFullSpin()            { return animTwistFullSpin; }
-    public void    setAnimTwistFullSpin(boolean v)  { animTwistFullSpin = v; }
+    public void    setAnimTwistFullSpin(boolean v)  { animTwistFullSpin = v; fireTransformChange(); }
     public boolean isAnimTwistSpreadGap()           { return animTwistSpreadGap; }
-    public void    setAnimTwistSpreadGap(boolean v) { animTwistSpreadGap = v; fireChange(); }
+    public void    setAnimTwistSpreadGap(boolean v) { animTwistSpreadGap = v; fireChange(); fireTransformChange(); }
+    public boolean isAnimMorphFadeDeaths()          { return animMorphFadeDeaths; }
+    public void    setAnimMorphFadeDeaths(boolean v) { animMorphFadeDeaths = v; fireTransformChange(); }
+    public boolean isAnimPopStayAtFocus()           { return animPopStayAtFocus; }
+    public void    setAnimPopStayAtFocus(boolean v) { animPopStayAtFocus = v; fireTransformChange(); }
+    public int  getAnimWallDamping()                { return animWallDamping; }
+    public void setAnimWallDamping(int v)           { animWallDamping = v; fireTransformChange(); }
     public int  getAnimMorphSpeedMs()      { return animMorphSpeedMs; }
-    public void setAnimMorphSpeedMs(int v) { if (animMorphSpeedMs == v) return; animMorphSpeedMs = v; fireChange(); }
+    public void setAnimMorphSpeedMs(int v) { if (animMorphSpeedMs == v) return; animMorphSpeedMs = v; fireChange(); fireTransformChange(); }
     public int  getAnimMorphHoldMs()       { return animMorphHoldMs; }
-    public void setAnimMorphHoldMs(int v)  { if (animMorphHoldMs == v) return; animMorphHoldMs = v; fireChange(); }
+    public void setAnimMorphHoldMs(int v)  { if (animMorphHoldMs == v) return; animMorphHoldMs = v; fireChange(); fireTransformChange(); }
 
     // ── UFT (Unique Frame Transform) API ─────────────────────────────────────
 
@@ -308,6 +319,9 @@ public class SpriteModel {
         animStayInCanvas       = s.animStayInCanvas;
         animTwistFullSpin      = s.animTwistFullSpin;
         animTwistSpreadGap     = s.animTwistSpreadGap;
+        animMorphFadeDeaths    = s.animMorphFadeDeaths;
+        animPopStayAtFocus     = s.animPopStayAtFocus;
+        animWallDamping        = s.animWallDamping;
     }
 
     public void syncSelectedUFT() {
@@ -317,15 +331,12 @@ public class SpriteModel {
 
     public void setSelectedUFT(int i) {
         if (i == selectedUFTIndex) return;
-        int prev = selectedUFTIndex;
         syncSelectedUFT();
         selectedUFTIndex = i;
-        if (i >= 0 && prev < 0) {
-            // Coming from no-selection: stamp current settings onto this UFT
-            uftSettings.set(i, TransformSettings.capture(this));
-            uftEnabled.add(i);
-        } else if (i >= 0 && uftEnabled.contains(i)) {
+        if (i >= 0) {
+            // Always load this tab's stored settings (new tabs have field-initializer defaults)
             applySettingsSilently(uftSettings.get(i));
+            uftEnabled.add(i);
         }
         fireChange();
     }
@@ -335,10 +346,6 @@ public class SpriteModel {
             uftEnabled.remove(i);
         } else {
             uftEnabled.add(i);
-            TransformSettings base = getTransformForTransition(i);
-            uftSettings.set(i, base != null ? base.copy() : TransformSettings.capture(this));
-            if (i == selectedUFTIndex)
-                applySettingsSilently(uftSettings.get(i));
         }
         fireChange();
     }
@@ -363,9 +370,14 @@ public class SpriteModel {
     public void setFullAnimationMode(boolean v)          { if (fullAnimationMode == v) return; fullAnimationMode = v; fireChange(); }
 
     public void addChangeListener(ChangeListener l) { listeners.add(l); }
+    public void addTransformListener(Runnable r)    { transformListeners.add(r); }
 
     private void fireChange() {
         ChangeEvent e = new ChangeEvent(this);
         for (ChangeListener l : listeners) l.stateChanged(e);
+    }
+
+    private void fireTransformChange() {
+        for (Runnable r : transformListeners) r.run();
     }
 }

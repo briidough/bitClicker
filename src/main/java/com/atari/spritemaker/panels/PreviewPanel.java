@@ -53,6 +53,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     // Timers
     private final javax.swing.Timer burstTimer;
     private final javax.swing.Timer pauseTimer;
+    private javax.swing.Timer settingChangeTimer;
 
     public PreviewPanel(SpriteModel model) {
         this.model = model;
@@ -123,6 +124,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         btnStep.addActionListener(e -> {
             uftLoopMode = false;
             playing = false;
+            precomputedTransitions = null;
             if (!animating) startBurst();
         });
         btnReset.addActionListener(e -> {
@@ -131,10 +133,27 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             uftLoopMode = false;
             currentFrameIdx = 0;
             currentTransitionIdx = 0;
+            precomputedTransitions = null;
             burstTimer.stop();
             pauseTimer.stop();
             canvas.repaint();
         });
+    }
+
+    public void onTransformSettingChanged() {
+        precomputedTransitions = null;
+        if (settingChangeTimer != null) settingChangeTimer.stop();
+        settingChangeTimer = new javax.swing.Timer(300, e -> {
+            settingChangeTimer = null;
+            if (model.getMode() == Mode.TRANSFORM && model.getAnimationFrames().size() >= 2) {
+                animating = false;
+                burstTimer.stop();
+                pauseTimer.stop();
+                startBurst();
+            }
+        });
+        settingChangeTimer.setRepeats(false);
+        settingChangeTimer.start();
     }
 
     @Override
@@ -272,6 +291,11 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         td.animExplodeStrength = model.getAnimExplodeStrength() / 100f;
         td.animUnsplodeStrength = model.getAnimUnsplodeStrength() / 100f;
         td.animStayInCanvas    = model.isAnimStayInCanvas();
+        td.animWallDamping     = model.getAnimWallDamping() / 100f;
+        td.animPopStayAtFocus  = model.isAnimPopStayAtFocus();
+        td.animGravityFocalX   = model.getAnimGravityFocalX();
+        td.animGravityFocalY   = model.getAnimGravityFocalY();
+        td.animMorphFadeDeaths = model.isAnimMorphFadeDeaths();
         td.animMorphSpeedMs    = model.getAnimMorphSpeedMs();
         td.animMorphHoldMs     = model.getAnimMorphHoldMs();
 
@@ -299,20 +323,24 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             td.lockedExtendMs = model.getAnimExtendMs();
             float extendRatio = td.animExplodeSpeedMs > 0
                 ? (float) td.lockedExtendMs / td.animExplodeSpeedMs : 0f;
+            // Gravity only applies when Stay at Focus is enabled; otherwise pure radial scatter
+            float tExtendEnd   = 1.0f + extendRatio;
+            float gravAtPeak   = td.animPopStayAtFocus ? gravStrength : 0f;
+            float gravAtExtend = td.animPopStayAtFocus ? gravStrength * tExtendEnd * tExtendEnd : 0f;
             td.explodedPositions = new int[td.fromPixels.length][2];
             td.extendedPositions = new int[td.fromPixels.length][2];
             for (int i = 0; i < td.fromPixels.length; i++) {
                 float peakPushOff = spread * td.fromSpeeds[i] * explodeStrength * 0.8f;
-                int expX = (int)(td.fromPixels[i][0] + td.fromDirs[i][0] * peakPushOff + td.fromGravDirs[i][0] * gravStrength);
-                int expY = (int)(td.fromPixels[i][1] + td.fromDirs[i][1] * peakPushOff + td.fromGravDirs[i][1] * gravStrength);
+                int expX = (int)(td.fromPixels[i][0] + td.fromDirs[i][0] * peakPushOff + td.fromGravDirs[i][0] * gravAtPeak);
+                int expY = (int)(td.fromPixels[i][1] + td.fromDirs[i][1] * peakPushOff + td.fromGravDirs[i][1] * gravAtPeak);
                 if (stay) {
                     expX = Math.max(0, Math.min(expX, bound));
                     expY = Math.max(0, Math.min(expY, bound));
                 }
                 td.explodedPositions[i][0] = expX;
                 td.explodedPositions[i][1] = expY;
-                int extX = expX + (int)((expX - td.fromPixels[i][0]) * extendRatio);
-                int extY = expY + (int)((expY - td.fromPixels[i][1]) * extendRatio);
+                int extX = (int)(td.fromPixels[i][0] + td.fromDirs[i][0] * peakPushOff + td.fromGravDirs[i][0] * gravAtExtend);
+                int extY = (int)(td.fromPixels[i][1] + td.fromDirs[i][1] * peakPushOff + td.fromGravDirs[i][1] * gravAtExtend);
                 if (stay) {
                     extX = Math.max(0, Math.min(extX, bound));
                     extY = Math.max(0, Math.min(extY, bound));
@@ -331,15 +359,66 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         burstTimer.stop();
         List<Color[][]> frames = model.getAnimationFrames();
         if (frames.size() < 2) return;
-        if (precomputedTransitions == null) precomputeAllTransitions();
+        int N = frames.size();
+
+        if (precomputedTransitions == null) {
+            model.syncSelectedUFT();
+            TransformSettings saved = TransformSettings.capture(model);
+            TransformSettings globalFallback = saved.copy();
+            precomputedTransitions = new TransitionData[N];
+            final TransitionData[] batch = precomputedTransitions;
+
+            // Compute only the current transition synchronously so animation starts immediately
+            TransformSettings ts = model.getTransformForTransition(currentTransitionIdx);
+            model.applySettingsSilently(ts != null ? ts : globalFallback);
+            batch[currentTransitionIdx] = buildTransitionData(frames, currentTransitionIdx, (currentTransitionIdx + 1) % N);
+            model.applySettingsSilently(saved);
+
+            // Compute remaining slots one-at-a-time via invokeLater while animation plays
+            scheduleNextLazyTransition(batch, (currentTransitionIdx + 1) % N, frames, globalFallback, saved);
+        }
+
         if (precomputedTransitions.length == 0) return;
         currentTransitionIdx = Math.min(currentTransitionIdx, precomputedTransitions.length - 1);
+
+        // If this slot is still null (lazy chain hasn't reached it yet), compute now
+        if (precomputedTransitions[currentTransitionIdx] == null) {
+            model.syncSelectedUFT();
+            TransformSettings saved = TransformSettings.capture(model);
+            TransformSettings globalFallback = saved.copy();
+            TransformSettings ts = model.getTransformForTransition(currentTransitionIdx);
+            model.applySettingsSilently(ts != null ? ts : globalFallback);
+            precomputedTransitions[currentTransitionIdx] = buildTransitionData(frames, currentTransitionIdx, (currentTransitionIdx + 1) % N);
+            model.applySettingsSilently(saved);
+        }
+
         active = precomputedTransitions[currentTransitionIdx];
         animProgress = 0f;
         midHoldElapsedMs = 0;
         extendElapsedMs = 0;
         animating = true;
         burstTimer.start();
+    }
+
+    private void scheduleNextLazyTransition(TransitionData[] batch, int startIdx, List<Color[][]> frames,
+                                             TransformSettings globalFallback, TransformSettings saved) {
+        int N = batch.length;
+        for (int i = 0; i < N; i++) {
+            int idx = (startIdx + i) % N;
+            if (batch[idx] == null) {
+                final int computeIdx = idx;
+                final int nextStart  = (idx + 1) % N;
+                SwingUtilities.invokeLater(() -> {
+                    if (precomputedTransitions != batch) return; // batch was invalidated
+                    TransformSettings ts = model.getTransformForTransition(computeIdx);
+                    model.applySettingsSilently(ts != null ? ts : globalFallback);
+                    batch[computeIdx] = buildTransitionData(frames, computeIdx, (computeIdx + 1) % N);
+                    model.applySettingsSilently(saved);
+                    scheduleNextLazyTransition(batch, nextStart, frames, globalFallback, saved);
+                });
+                return;
+            }
+        }
     }
 
     private void tickBurst() {
@@ -696,8 +775,16 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             g.setColor(canvasBg);
             g.fillRect(p[0], p[1], cellSize, cellSize);
             int offset = (cellSize - drawSize) / 2;
-            g.setColor(new Color(p[2]));
-            g.fillRect(p[0] + offset, p[1] + offset, drawSize, drawSize);
+            if (active.animMorphFadeDeaths) {
+                java.awt.Composite old = g.getComposite();
+                g.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, 1f - t));
+                g.setColor(new Color(p[2]));
+                g.fillRect(p[0] + offset, p[1] + offset, drawSize, drawSize);
+                g.setComposite(old);
+            } else {
+                g.setColor(new Color(p[2]));
+                g.fillRect(p[0] + offset, p[1] + offset, drawSize, drawSize);
+            }
         }
 
         for (int i = 0; i < active.morphRecolorOld.length; i++) {
@@ -725,6 +812,29 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         }
     }
 
+    private int popBounce(int pos, int bound, float damping) {
+        for (int b = 0; b < 3; b++) {
+            if (pos >= 0 && pos <= bound) break;
+            if (pos < 0)     pos = (int)(-pos * damping);
+            else if (pos > bound) pos = (int)(bound - (pos - bound) * damping);
+        }
+        return Math.max(0, Math.min(pos, bound));
+    }
+
+    private void applyStayAtFocus(int[] result, int cellSize) {
+        int gs = model.getGridSize();
+        float gx = active.animGravityFocalX / 100f * gs * cellSize;
+        float gy = active.animGravityFocalY / 100f * gs * cellSize;
+        float dx = gx - (result[0] + cellSize * 0.5f);
+        float dy = gy - (result[1] + cellSize * 0.5f);
+        float dist = Math.max(1f, (float) Math.sqrt(dx * dx + dy * dy));
+        float maxDist = gs * cellSize;
+        float proximity = 1f - Math.min(1f, dist / maxDist);
+        float pullMag = active.animGravityPull * active.animSpread * proximity * proximity * 4f;
+        result[0] += (int)(dx / dist * pullMag);
+        result[1] += (int)(dy / dist * pullMag);
+    }
+
     private void paintPixelPop(Graphics2D g) {
         if (active == null) return;
         int cellSize = CELL * zoomLevel;
@@ -732,6 +842,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         float gravStrength = active.animGravityPull * spread * 6f;
         float pullSpeed = 1.0f + active.animGravityPull;
         boolean stay = active.animStayInCanvas;
+        float damping = active.animWallDamping;
         int bound = model.getGridSize() * cellSize - cellSize;
 
         float explodeStrength = active.animExplodeStrength;
@@ -739,34 +850,36 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         float snapWindow      = 1f - snapThreshold;
 
         int extendMs = active.lockedExtendMs;
+        int[] pos = new int[2];
 
         if (animProgress < 0.5f) {
             float t = animProgress / 0.5f;
             float tEased = easingOut(t, active.animEasing);
             float diminish = 1f - t * 0.2f;
-            float gravOffset = gravStrength * t * t;
+            float gravOffset = active.animPopStayAtFocus ? gravStrength * t * t : 0f;
             for (int i = 0; i < active.fromPixels.length; i++) {
                 float pushOff = spread * active.fromSpeeds[i] * explodeStrength * tEased * diminish;
-                int px = (int)(active.fromPixels[i][0] + active.fromDirs[i][0] * pushOff + active.fromGravDirs[i][0] * gravOffset);
-                int py = (int)(active.fromPixels[i][1] + active.fromDirs[i][1] * pushOff + active.fromGravDirs[i][1] * gravOffset);
-                if (stay) {
-                    px = Math.max(0, Math.min(px, bound));
-                    py = Math.max(0, Math.min(py, bound));
-                }
+                pos[0] = (int)(active.fromPixels[i][0] + active.fromDirs[i][0] * pushOff + active.fromGravDirs[i][0] * gravOffset);
+                pos[1] = (int)(active.fromPixels[i][1] + active.fromDirs[i][1] * pushOff + active.fromGravDirs[i][1] * gravOffset);
+                if (active.animPopStayAtFocus) applyStayAtFocus(pos, cellSize);
+                if (stay) { pos[0] = popBounce(pos[0], bound, damping); pos[1] = popBounce(pos[1], bound, damping); }
                 g.setColor(active.fromColors[i]);
-                g.fillRect(px, py, cellSize, cellSize);
+                g.fillRect(pos[0], pos[1], cellSize, cellSize);
             }
         } else if (extendMs > 0 && extendElapsedMs < extendMs) {
-            float extendT = (float) extendElapsedMs / extendMs;
+            float extendFrac = (float) extendElapsedMs / Math.max(1, active.animExplodeSpeedMs);
+            float tRaw       = 1.0f + extendFrac;
+            float tEased     = easingOut(1.0f, active.animEasing);
+            float diminish   = 0.8f;
+            float gravOffset = active.animPopStayAtFocus ? gravStrength * tRaw * tRaw : 0f;
             for (int i = 0; i < active.fromPixels.length; i++) {
-                int px = (int)(active.explodedPositions[i][0] + (active.extendedPositions[i][0] - active.explodedPositions[i][0]) * extendT);
-                int py = (int)(active.explodedPositions[i][1] + (active.extendedPositions[i][1] - active.explodedPositions[i][1]) * extendT);
-                if (stay) {
-                    px = Math.max(0, Math.min(px, bound));
-                    py = Math.max(0, Math.min(py, bound));
-                }
+                float pushOff = spread * active.fromSpeeds[i] * explodeStrength * tEased * diminish;
+                pos[0] = (int)(active.fromPixels[i][0] + active.fromDirs[i][0] * pushOff + active.fromGravDirs[i][0] * gravOffset);
+                pos[1] = (int)(active.fromPixels[i][1] + active.fromDirs[i][1] * pushOff + active.fromGravDirs[i][1] * gravOffset);
+                if (active.animPopStayAtFocus) applyStayAtFocus(pos, cellSize);
+                if (stay) { pos[0] = popBounce(pos[0], bound, damping); pos[1] = popBounce(pos[1], bound, damping); }
                 g.setColor(active.fromColors[i]);
-                g.fillRect(px, py, cellSize, cellSize);
+                g.fillRect(pos[0], pos[1], cellSize, cellSize);
             }
         } else if (midHoldElapsedMs < active.animPopHoldMs) {
             int[][] holdPos = extendMs > 0 ? active.extendedPositions : active.explodedPositions;
@@ -787,14 +900,12 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                     remainFrac = snapWindow * (1f - Math.min(1f, snapT * pullSpeed));
                 }
                 int sIdx = startPos.length > 0 ? i % startPos.length : -1;
-                int px = sIdx >= 0 ? (int)(active.toPixels[i][0] + (startPos[sIdx][0] - active.toPixels[i][0]) * remainFrac) : active.toPixels[i][0];
-                int py = sIdx >= 0 ? (int)(active.toPixels[i][1] + (startPos[sIdx][1] - active.toPixels[i][1]) * remainFrac) : active.toPixels[i][1];
-                if (stay) {
-                    px = Math.max(0, Math.min(px, bound));
-                    py = Math.max(0, Math.min(py, bound));
-                }
+                pos[0] = sIdx >= 0 ? (int)(active.toPixels[i][0] + (startPos[sIdx][0] - active.toPixels[i][0]) * remainFrac) : active.toPixels[i][0];
+                pos[1] = sIdx >= 0 ? (int)(active.toPixels[i][1] + (startPos[sIdx][1] - active.toPixels[i][1]) * remainFrac) : active.toPixels[i][1];
+                if (active.animPopStayAtFocus) applyStayAtFocus(pos, cellSize);
+                if (stay) { pos[0] = popBounce(pos[0], bound, damping); pos[1] = popBounce(pos[1], bound, damping); }
                 g.setColor(active.toColors[i]);
-                g.fillRect(px, py, cellSize, cellSize);
+                g.fillRect(pos[0], pos[1], cellSize, cellSize);
             }
         }
     }
@@ -825,6 +936,10 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         float animGravityPull, animGravityPush;
         float animExplodeStrength, animUnsplodeStrength;
         boolean animStayInCanvas;
+        float animWallDamping;
+        boolean animPopStayAtFocus;
+        int animGravityFocalX, animGravityFocalY;
+        boolean animMorphFadeDeaths;
         int animMorphSpeedMs, animMorphHoldMs;
     }
 

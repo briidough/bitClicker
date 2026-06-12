@@ -40,11 +40,20 @@ public class ActionEditsPanel extends JPanel implements ChangeListener {
     private final CardLayout transformCardLayout;
     private final JPanel transformCardPanel;
 
+    private final PixelBurstPanel  burstPanel;
+    private final PixelPopPanel    popPanel;
+    private final PixelTwistPanel  twistPanel;
+    private final PixelMorphPanel  morphPanel;
+
     public ActionEditsPanel(SpriteModel model,
                              PixelBurstPanel  burstPanel,
                              PixelPopPanel    popPanel,
                              PixelTwistPanel  twistPanel,
                              PixelMorphPanel  morphPanel) {
+        this.burstPanel  = burstPanel;
+        this.popPanel    = popPanel;
+        this.twistPanel  = twistPanel;
+        this.morphPanel  = morphPanel;
         this.model = model;
         setLayout(new BorderLayout());
         Color sepColor = UIManager.getColor("Separator.foreground");
@@ -160,9 +169,22 @@ public class ActionEditsPanel extends JPanel implements ChangeListener {
         revalidateParent();
     }
 
+    public void syncTransformCard() {
+        int t = model.getAnimEffectType();
+        String key = t == 1 ? "pop" : t == 2 ? "twist" : t == 3 ? "morph" : "burst";
+        transformCardLayout.show(transformCardPanel, key);
+    }
+
     private void revalidateParent() {
         Container p = getParent();
         if (p != null) { p.revalidate(); p.repaint(); }
+    }
+
+    public void refreshTransformUI() {
+        burstPanel.refresh();
+        popPanel.refresh();
+        twistPanel.refresh();
+        morphPanel.refresh();
     }
 
     @Override
@@ -171,6 +193,7 @@ public class ActionEditsPanel extends JPanel implements ChangeListener {
         for (ColorSwatchPanel[] row : swatches)
             for (ColorSwatchPanel swatch : row)
                 swatch.repaint();
+        refreshTransformUI();
     }
 
     @Override public Dimension getPreferredSize() { return new Dimension(FIXED_WIDTH, super.getPreferredSize().height); }

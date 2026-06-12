@@ -36,6 +36,8 @@ public final class AnimConfig {
 
     public static final int POP_EXTEND_MS_MIN = 0, POP_EXTEND_MS_MAX = 2000, POP_EXTEND_MS_DEF = 500;
 
+    public static final int POP_WALL_DAMPING_MIN = 0, POP_WALL_DAMPING_MAX = 100, POP_WALL_DAMPING_DEF = 50;
+
     // ── Pixel Twist ──────────────────────────────────────────────────────────
 
     public static final int TWIST_FIRST_SPEED_MIN  = 0, TWIST_FIRST_SPEED_MAX  = 100, TWIST_FIRST_SPEED_DEF  = 30;

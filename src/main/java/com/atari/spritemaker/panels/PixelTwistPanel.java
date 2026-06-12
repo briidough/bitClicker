@@ -10,6 +10,10 @@ public class PixelTwistPanel extends JPanel {
 
     private final JSlider sliderFirstSpeed, sliderSecondSpeed;
     private final JSlider sliderFirstSmooth, sliderSecondSmooth;
+    private final JComboBox<String> comboDirection;
+    private final JCheckBox chkFullSpin, chkSpread;
+
+    private boolean updating = false;
 
     public PixelTwistPanel(SpriteModel model) {
         this.model = model;
@@ -21,19 +25,19 @@ public class PixelTwistPanel extends JPanel {
         dirLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
         add(dirLbl);
         add(Box.createVerticalStrut(2));
-        JComboBox<String> comboDirection = new JComboBox<>(new String[]{"Clockwise", "Counter-clockwise"});
+        comboDirection = new JComboBox<>(new String[]{"Clockwise", "Counter-clockwise"});
         comboDirection.setSelectedIndex(model.getAnimTwistDirection());
         comboDirection.setAlignmentX(Component.LEFT_ALIGNMENT);
         comboDirection.setMaximumSize(new Dimension(Integer.MAX_VALUE, comboDirection.getPreferredSize().height));
-        comboDirection.addActionListener(e -> model.setAnimTwistDirection(comboDirection.getSelectedIndex()));
+        comboDirection.addActionListener(e -> { if (!updating) model.setAnimTwistDirection(comboDirection.getSelectedIndex()); });
         add(comboDirection);
 
         add(Box.createVerticalStrut(8));
-        JCheckBox chkFullSpin = new JCheckBox("Full Spin (360°)");
+        chkFullSpin = new JCheckBox("Full Spin (360°)");
         chkFullSpin.setSelected(model.isAnimTwistFullSpin());
         chkFullSpin.setAlignmentX(Component.LEFT_ALIGNMENT);
         chkFullSpin.setMaximumSize(new Dimension(Integer.MAX_VALUE, chkFullSpin.getPreferredSize().height));
-        chkFullSpin.addActionListener(e -> model.setAnimTwistFullSpin(chkFullSpin.isSelected()));
+        chkFullSpin.addActionListener(e -> { if (!updating) model.setAnimTwistFullSpin(chkFullSpin.isSelected()); });
         add(chkFullSpin);
 
         add(Box.createVerticalStrut(10));
@@ -44,14 +48,15 @@ public class PixelTwistPanel extends JPanel {
 
         sliderFirstSpeed = new JSlider(AnimConfig.TWIST_FIRST_SPEED_MIN, AnimConfig.TWIST_FIRST_SPEED_MAX,
                 model.getAnimTwistFirstSpeedMs() / AnimConfig.TWIST_SPEED_SCALE);
-        sliderFirstSpeed.addChangeListener(e ->
-                model.setAnimTwistFirstSpeedMs(sliderFirstSpeed.getValue() * AnimConfig.TWIST_SPEED_SCALE));
+        sliderFirstSpeed.addChangeListener(e -> {
+            if (!updating) model.setAnimTwistFirstSpeedMs(sliderFirstSpeed.getValue() * AnimConfig.TWIST_SPEED_SCALE);
+        });
         add(wrapSlider("Speed (×10 ms)", sliderFirstSpeed, AnimConfig.TWIST_SPEED_SCALE));
 
         add(Box.createVerticalStrut(4));
         sliderFirstSmooth = new JSlider(AnimConfig.TWIST_FIRST_SMOOTH_MIN, AnimConfig.TWIST_FIRST_SMOOTH_MAX,
                 model.getAnimTwistFirstSmooth());
-        sliderFirstSmooth.addChangeListener(e -> model.setAnimTwistFirstSmooth(sliderFirstSmooth.getValue()));
+        sliderFirstSmooth.addChangeListener(e -> { if (!updating) model.setAnimTwistFirstSmooth(sliderFirstSmooth.getValue()); });
         add(wrapSlider("Smooth", sliderFirstSmooth));
 
         add(Box.createVerticalStrut(10));
@@ -62,33 +67,46 @@ public class PixelTwistPanel extends JPanel {
 
         sliderSecondSpeed = new JSlider(AnimConfig.TWIST_SECOND_SPEED_MIN, AnimConfig.TWIST_SECOND_SPEED_MAX,
                 model.getAnimTwistSecondSpeedMs() / AnimConfig.TWIST_SPEED_SCALE);
-        sliderSecondSpeed.addChangeListener(e ->
-                model.setAnimTwistSecondSpeedMs(sliderSecondSpeed.getValue() * AnimConfig.TWIST_SPEED_SCALE));
+        sliderSecondSpeed.addChangeListener(e -> {
+            if (!updating) model.setAnimTwistSecondSpeedMs(sliderSecondSpeed.getValue() * AnimConfig.TWIST_SPEED_SCALE);
+        });
         add(wrapSlider("Speed (×10 ms)", sliderSecondSpeed, AnimConfig.TWIST_SPEED_SCALE));
 
         add(Box.createVerticalStrut(4));
         sliderSecondSmooth = new JSlider(AnimConfig.TWIST_SECOND_SMOOTH_MIN, AnimConfig.TWIST_SECOND_SMOOTH_MAX,
                 model.getAnimTwistSecondSmooth());
-        sliderSecondSmooth.addChangeListener(e -> model.setAnimTwistSecondSmooth(sliderSecondSmooth.getValue()));
+        sliderSecondSmooth.addChangeListener(e -> { if (!updating) model.setAnimTwistSecondSmooth(sliderSecondSmooth.getValue()); });
         add(wrapSlider("Smooth", sliderSecondSmooth));
 
         add(Box.createVerticalStrut(10));
-        JCheckBox chkSpread = new JCheckBox("Spread");
+        chkSpread = new JCheckBox("Spread");
         chkSpread.setSelected(model.isAnimTwistSpreadGap());
         chkSpread.setAlignmentX(Component.LEFT_ALIGNMENT);
         chkSpread.setMaximumSize(new Dimension(Integer.MAX_VALUE, chkSpread.getPreferredSize().height));
-        chkSpread.addActionListener(e -> model.setAnimTwistSpreadGap(chkSpread.isSelected()));
+        chkSpread.addActionListener(e -> { if (!updating) model.setAnimTwistSpreadGap(chkSpread.isSelected()); });
         add(chkSpread);
 
         add(Box.createVerticalStrut(12));
         JButton resetBtn = new JButton("Reset Defaults");
-        resetBtn.addActionListener(e -> resetDefaults(comboDirection, chkFullSpin, chkSpread));
+        resetBtn.addActionListener(e -> resetDefaults());
         resetBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         resetBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, resetBtn.getPreferredSize().height));
         add(resetBtn);
     }
 
-    public void resetDefaults(JComboBox<String> comboDirection, JCheckBox chkFullSpin, JCheckBox chkSpread) {
+    public void refresh() {
+        updating = true;
+        comboDirection.setSelectedIndex(model.getAnimTwistDirection());
+        chkFullSpin.setSelected(model.isAnimTwistFullSpin());
+        sliderFirstSpeed.setValue(model.getAnimTwistFirstSpeedMs() / AnimConfig.TWIST_SPEED_SCALE);
+        sliderFirstSmooth.setValue(model.getAnimTwistFirstSmooth());
+        sliderSecondSpeed.setValue(model.getAnimTwistSecondSpeedMs() / AnimConfig.TWIST_SPEED_SCALE);
+        sliderSecondSmooth.setValue(model.getAnimTwistSecondSmooth());
+        chkSpread.setSelected(model.isAnimTwistSpreadGap());
+        updating = false;
+    }
+
+    public void resetDefaults() {
         model.setAnimTwistFirstSpeedMs(AnimConfig.TWIST_FIRST_SPEED_DEF * AnimConfig.TWIST_SPEED_SCALE);
         sliderFirstSpeed.setValue(AnimConfig.TWIST_FIRST_SPEED_DEF);
         model.setAnimTwistSecondSpeedMs(AnimConfig.TWIST_SECOND_SPEED_DEF * AnimConfig.TWIST_SPEED_SCALE);

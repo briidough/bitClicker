@@ -44,6 +44,7 @@ public class SpriteEditorFrame extends JFrame implements ChangeListener {
         model.addChangeListener(previewPanel);
         model.addChangeListener(actionEditsPanel);
         model.addChangeListener(this);
+        model.addTransformListener(previewPanel::onTransformSettingChanged);
 
         // ── menu bar ──────────────────────────────────────────────────────────
         JMenuBar menuBar = new JMenuBar();
