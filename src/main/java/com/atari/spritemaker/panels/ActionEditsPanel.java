@@ -47,7 +47,8 @@ public class ActionEditsPanel extends JPanel implements ChangeListener {
                              PixelMorphPanel  morphPanel) {
         this.model = model;
         setLayout(new BorderLayout());
-        setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.GRAY));
+        Color sepColor = UIManager.getColor("Separator.foreground");
+        setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, sepColor != null ? sepColor : Color.GRAY));
 
         // Initialize custom colours (white/grey/black defaults)
         customColors = new Color[3][4];

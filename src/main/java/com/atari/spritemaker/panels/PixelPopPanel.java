@@ -19,6 +19,7 @@ public class PixelPopPanel extends JPanel {
         this.model = model;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setAlignmentX(Component.LEFT_ALIGNMENT);
+        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         sliderExplodeSpeed = new JSlider(AnimConfig.POP_EXPLODE_SPEED_MIN, AnimConfig.POP_EXPLODE_SPEED_MAX, model.getAnimExplodeSpeedMs());
         sliderExplodeSpeed.addChangeListener(e -> model.setAnimExplodeSpeedMs(sliderExplodeSpeed.getValue()));
@@ -73,6 +74,7 @@ public class PixelPopPanel extends JPanel {
         JCheckBox chkStayInCanvas = new JCheckBox("Stay in Canvas");
         chkStayInCanvas.setSelected(model.isAnimStayInCanvas());
         chkStayInCanvas.setAlignmentX(Component.LEFT_ALIGNMENT);
+        chkStayInCanvas.setMaximumSize(new Dimension(Integer.MAX_VALUE, chkStayInCanvas.getPreferredSize().height));
         chkStayInCanvas.addActionListener(e -> model.setAnimStayInCanvas(chkStayInCanvas.isSelected()));
         add(chkStayInCanvas);
 

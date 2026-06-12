@@ -17,6 +17,7 @@ public class PixelBurstPanel extends JPanel {
         this.model = model;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setAlignmentX(Component.LEFT_ALIGNMENT);
+        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         sliderSpread = new JSlider(AnimConfig.BURST_SPREAD_MIN, AnimConfig.BURST_SPREAD_MAX, model.getAnimSpread());
         sliderSpread.addChangeListener(e -> model.setAnimSpread(sliderSpread.getValue()));

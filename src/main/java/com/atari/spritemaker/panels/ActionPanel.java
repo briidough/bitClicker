@@ -204,7 +204,6 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnPop   = new JToggleButton("Pixel Pop");
         btnTwist = new JToggleButton("Pixel Twist");
         btnMorph = new JToggleButton("Pixel Morph");
-        btnBurst.setSelected(true);
 
         effectGroup = new ButtonGroup();
         effectGroup.add(btnBurst); effectGroup.add(btnPop);
@@ -240,7 +239,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         return new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) {
                 if (model.getAnimEffectType() == effectType && actionEditsPanel != null) {
-                    if (actionEditsPanel.isVisible()) actionEditsPanel.setVisible(false);
+                    if (actionEditsPanel.isVisible()) { actionEditsPanel.setVisible(false); effectGroup.clearSelection(); }
                     else actionEditsPanel.showTransformMode(key);
                     revalidateParent();
                 }
@@ -305,6 +304,9 @@ public class ActionPanel extends JPanel implements ChangeListener {
                     String key = t == 1 ? "pop" : t == 2 ? "twist" : t == 3 ? "morph" : "burst";
                     actionEditsPanel.showTransformMode(key);
                 }
+            } else {
+                effectGroup.clearSelection();
+                if (actionEditsPanel != null) actionEditsPanel.setVisible(false);
             }
 
             if (uftLabel != null) {

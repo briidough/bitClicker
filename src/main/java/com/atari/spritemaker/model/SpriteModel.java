@@ -317,10 +317,16 @@ public class SpriteModel {
 
     public void setSelectedUFT(int i) {
         if (i == selectedUFTIndex) return;
+        int prev = selectedUFTIndex;
         syncSelectedUFT();
         selectedUFTIndex = i;
-        if (i >= 0 && uftEnabled.contains(i))
+        if (i >= 0 && prev < 0) {
+            // Coming from no-selection: stamp current settings onto this UFT
+            uftSettings.set(i, TransformSettings.capture(this));
+            uftEnabled.add(i);
+        } else if (i >= 0 && uftEnabled.contains(i)) {
             applySettingsSilently(uftSettings.get(i));
+        }
         fireChange();
     }
 

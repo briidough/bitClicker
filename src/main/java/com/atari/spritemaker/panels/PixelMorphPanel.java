@@ -17,6 +17,7 @@ public class PixelMorphPanel extends JPanel {
         this.model = model;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setAlignmentX(Component.LEFT_ALIGNMENT);
+        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         sliderMorphSpeed = new JSlider(AnimConfig.MORPH_SPEED_MIN, AnimConfig.MORPH_SPEED_MAX, model.getAnimMorphSpeedMs());
         sliderMorphSpeed.addChangeListener(e -> model.setAnimMorphSpeedMs(sliderMorphSpeed.getValue()));

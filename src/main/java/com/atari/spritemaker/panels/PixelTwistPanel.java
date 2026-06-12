@@ -15,6 +15,7 @@ public class PixelTwistPanel extends JPanel {
         this.model = model;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setAlignmentX(Component.LEFT_ALIGNMENT);
+        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         JLabel dirLbl = new JLabel("Direction:");
         dirLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -31,6 +32,7 @@ public class PixelTwistPanel extends JPanel {
         JCheckBox chkFullSpin = new JCheckBox("Full Spin (360°)");
         chkFullSpin.setSelected(model.isAnimTwistFullSpin());
         chkFullSpin.setAlignmentX(Component.LEFT_ALIGNMENT);
+        chkFullSpin.setMaximumSize(new Dimension(Integer.MAX_VALUE, chkFullSpin.getPreferredSize().height));
         chkFullSpin.addActionListener(e -> model.setAnimTwistFullSpin(chkFullSpin.isSelected()));
         add(chkFullSpin);
 
@@ -74,6 +76,7 @@ public class PixelTwistPanel extends JPanel {
         JCheckBox chkSpread = new JCheckBox("Spread");
         chkSpread.setSelected(model.isAnimTwistSpreadGap());
         chkSpread.setAlignmentX(Component.LEFT_ALIGNMENT);
+        chkSpread.setMaximumSize(new Dimension(Integer.MAX_VALUE, chkSpread.getPreferredSize().height));
         chkSpread.addActionListener(e -> model.setAnimTwistSpreadGap(chkSpread.isSelected()));
         add(chkSpread);
 
