@@ -72,8 +72,12 @@ public class SpriteEditorFrame extends JFrame implements ChangeListener {
         miSave   .setAccelerator(KeyStroke.getKeyStroke("ctrl S"));
         miExport .setAccelerator(KeyStroke.getKeyStroke("ctrl E"));
         miLoadSvg.setAccelerator(KeyStroke.getKeyStroke("ctrl L"));
-        miSaveSga.setAccelerator(KeyStroke.getKeyStroke("ctrl shift S"));
-        miLoadSga.setAccelerator(KeyStroke.getKeyStroke("ctrl shift O"));
+        JMenuItem miExportBxl = new JMenuItem("Export for Web (.bxl)");
+        miExportBxl.addActionListener(e -> actionPanel.exportBxl());
+
+        miSaveSga   .setAccelerator(KeyStroke.getKeyStroke("ctrl shift S"));
+        miLoadSga   .setAccelerator(KeyStroke.getKeyStroke("ctrl shift O"));
+        miExportBxl .setAccelerator(KeyStroke.getKeyStroke("ctrl shift E"));
 
         fileMenu.add(miNew);
         fileMenu.add(miLoad);
@@ -84,6 +88,8 @@ public class SpriteEditorFrame extends JFrame implements ChangeListener {
         fileMenu.addSeparator();
         fileMenu.add(miSaveSga);
         fileMenu.add(miLoadSga);
+        fileMenu.addSeparator();
+        fileMenu.add(miExportBxl);
         menuBar.add(fileMenu);
 
         // ── options menu (directly beside File) ───────────────────────────────

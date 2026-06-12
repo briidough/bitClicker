@@ -893,6 +893,21 @@ public class ActionPanel extends JPanel implements ChangeListener {
             JOptionPane.showMessageDialog(this, "No non-empty frames to save.");
     }
 
+    public void exportBxl() {
+        File file = chooseFile(false, "bxl");
+        if (file == null) return;
+        String path = ensureExt(file.getAbsolutePath(), ".bxl");
+        model.syncSelectedUFT();
+        com.atari.spritemaker.model.TransformSettings globalFallback =
+            com.atari.spritemaker.model.TransformSettings.capture(model);
+        String json = com.atari.spritemaker.export.BxlExporter.export(model, globalFallback);
+        try (PrintWriter pw = new PrintWriter(new FileWriter(path))) {
+            pw.print(json);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Export for Web failed: " + ex.getMessage());
+        }
+    }
+
     public void loadSpritamation() {
         File file = chooseFile(true, "sga");
         if (file == null) return;
