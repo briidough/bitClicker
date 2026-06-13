@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>bitClicker Web</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <header class="topbar">
+      <span class="logo">bitClicker</span>
+      <div class="size-btns">
+        <button class="btn size-btn active" data-size="16">16×16</button>
+        <button class="btn size-btn" data-size="32">32×32</button>
+      </div>
+      <div class="file-menu-wrap">
+        <button class="btn" id="fileMenuBtn">File ▾</button>
+        <div class="file-dropdown hidden" id="fileDropdown">
+          <button id="cmdNew">New</button>
+          <button id="cmdLoad">Load .sga</button>
+          <button id="cmdSave">Save .sga</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="workspace">
+
+      <section class="editor-col">
+        <div class="frame-tabs" id="frameTabs"></div>
+
+        <canvas id="grid"></canvas>
+
+        <div class="palette-area">
+          <div class="palette-bar" id="paletteBar"></div>
+          <div class="palette-controls">
+            <span class="slot-label" id="slotLabel">Slot 0 (black)</span>
+            <input type="color" id="slotColorPicker" title="Pick slot color">
+            <button class="btn sm danger" id="clearSlotBtn" style="display:none">Remove</button>
+            <span class="hint">Right-click = erase</span>
+            <button class="btn sm danger" id="clearAllBtn">Clear frame</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="preview-col">
+        <h3 class="panel-title">Preview</h3>
+        <div class="preview-canvas-wrap">
+          <canvas id="preview"></canvas>
+          <div class="preview-frame-label" id="previewFrameLabel">F1</div>
+        </div>
+        <div class="preview-controls">
+          <button class="btn preview-btn" id="previewStop"  title="Stop &amp; reset to frame 1">&#9646;&#9646;</button>
+          <button class="btn preview-btn" id="previewStep"  title="Step one frame">&#9654;&#9646;</button>
+          <button class="btn preview-btn" id="previewPlay"  title="Play all frames">&#9654;</button>
+        </div>
+      </section>
+
+      <section class="transform-col" id="transformPanel"></section>
+
+    </main>
+
+  </div>
+
+  <input type="file" id="fileInput" accept=".sga" style="display:none">
+
+  <script src="jszip.min.js"></script>
+  <script src="anim.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>

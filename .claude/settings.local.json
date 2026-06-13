@@ -16,7 +16,9 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(xargs javac *)",
-      "Bash(git -C /home/archB/bitClicker add src/main/java/com/atari/spritemaker/panels/ActionPanel.java)"
+      "Bash(git -C /home/archB/bitClicker add src/main/java/com/atari/spritemaker/panels/ActionPanel.java)",
+      "Bash(curl -fsSL \"https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js\" -o /home/archB/repos/bitClicker/web/public/jszip.min.js)",
+      "Bash(flatpak-spawn --host /usr/bin/jar cfe sprite-editor.jar com.atari.spritemaker.Main -C out .)"
     ]
   }
 }
