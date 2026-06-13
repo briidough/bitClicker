@@ -92,6 +92,18 @@ public class SpriteEditorFrame extends JFrame implements ChangeListener {
         fileMenu.add(miExportBxl);
         menuBar.add(fileMenu);
 
+        // ── edit menu ─────────────────────────────────────────────────────────
+        JMenu editMenu = new JMenu("Edit");
+        JMenuItem miUndo = new JMenuItem("Undo");
+        JMenuItem miRedo = new JMenuItem("Redo");
+        miUndo.setAccelerator(KeyStroke.getKeyStroke("ctrl Z"));
+        miRedo.setAccelerator(KeyStroke.getKeyStroke("ctrl Y"));
+        miUndo.addActionListener(e -> model.undo());
+        miRedo.addActionListener(e -> model.redo());
+        editMenu.add(miUndo);
+        editMenu.add(miRedo);
+        menuBar.add(editMenu);
+
         // ── options menu (directly beside File) ───────────────────────────────
         JMenu optionsMenu = new JMenu("Options");
 

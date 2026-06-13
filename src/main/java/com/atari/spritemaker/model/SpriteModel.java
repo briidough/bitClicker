@@ -2,6 +2,7 @@ package com.atari.spritemaker.model;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -63,6 +64,10 @@ public class SpriteModel {
     private int animMorphHoldMs  = 300;
     private final List<ChangeListener> listeners = new ArrayList<>();
     private final List<Runnable> transformListeners = new ArrayList<>();
+
+    private static final int MAX_HISTORY = 50;
+    private final ArrayDeque<Color[][]> undoStack = new ArrayDeque<>();
+    private final ArrayDeque<Color[][]> redoStack = new ArrayDeque<>();
 
     // Unique Frame Transforms
     private final List<TransformSettings> uftSettings = new ArrayList<>();
@@ -140,6 +145,8 @@ public class SpriteModel {
         uftEnabled.clear();
         selectedUFTIndex = -1;
         fullAnimationMode = false;
+        undoStack.clear();
+        redoStack.clear();
         applySettingsSilently(new TransformSettings());
         ensureUFTCapacity();
         fireChange();
@@ -162,6 +169,24 @@ public class SpriteModel {
         return copy;
     }
 
+    public void pushUndoSnapshot() {
+        if (undoStack.size() >= MAX_HISTORY) undoStack.pollLast();
+        undoStack.push(getGridCopy());
+        redoStack.clear();
+    }
+
+    public void undo() {
+        if (undoStack.isEmpty()) return;
+        redoStack.push(getGridCopy());
+        setGrid(undoStack.pop());
+    }
+
+    public void redo() {
+        if (redoStack.isEmpty()) return;
+        undoStack.push(getGridCopy());
+        setGrid(redoStack.pop());
+    }
+
     public List<Color[][]> getAnimationFrames() { return animationFrames; }
     public void setAnimationFrames(List<Color[][]> frames) { animationFrames = frames; fireChange(); }
 
@@ -175,6 +200,8 @@ public class SpriteModel {
         grid = animationFrames.get(index);
         bgImage = frameBackgrounds.get(index);
         showBgImage = true;
+        undoStack.clear();
+        redoStack.clear();
         fireChange();
     }
 

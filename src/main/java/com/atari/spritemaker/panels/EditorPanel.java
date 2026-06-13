@@ -19,9 +19,11 @@ public class EditorPanel extends JPanel implements ChangeListener {
     private final JToggleButton eraserBtn;
     private final JLabel modeLabel;
     private final FrameTabBar frameTabBar;
+    private Color lastKnownActiveColor;
 
     public EditorPanel(SpriteModel model) {
         this.model = model;
+        this.lastKnownActiveColor = model.getActiveColor();
         setLayout(new BorderLayout(0, 4));
 
         gridCanvas = new GridCanvas();
@@ -48,7 +50,11 @@ public class EditorPanel extends JPanel implements ChangeListener {
         boolean isTransform = model.getMode() == Mode.TRANSFORM;
         modeLabel.setText(isTransform ? "— Transform —" : "— Draw —");
         eraserBtn.setVisible(!isTransform);
-        if (model.getActiveColor() != null) eraserBtn.setSelected(false);
+        Color currentColor = model.getActiveColor();
+        if (currentColor != null && !currentColor.equals(lastKnownActiveColor)) {
+            eraserBtn.setSelected(false);
+        }
+        lastKnownActiveColor = currentColor;
         if (model.getDrawingTool() == DrawingTool.PENCIL) gridCanvas.cancelLine();
         if (model.getDrawingTool() != DrawingTool.DRAG)   gridCanvas.clearDrag();
         gridCanvas.updateSize();
@@ -74,6 +80,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
                     int col = e.getX() / CELL, row = e.getY() / CELL;
                     int size = model.getGridSize();
                     if (row < 0 || row >= size || col < 0 || col >= size) return;
+                    model.pushUndoSnapshot();
                     if (model.getDrawingTool() == DrawingTool.DRAG) {
                         if (model.getCellColor(row, col) != null) {
                             dragStartRow = row;
