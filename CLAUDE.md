@@ -16,9 +16,16 @@ flatpak-spawn --host /usr/bin/jar cfe sprite-editor.jar com.atari.spritemaker.Ma
 
 # Run
 $JAVA_HOME/bin/java -jar sprite-editor.jar
+
+# bixelPlay.js — after any animation feature changes, sync the standalone player:
+cp bixelPlay.js web/public/bixelPlay.js
 ```
 
 No external dependencies — pure Java 11+ with Swing only.
+
+**bixelPlay.js** (`/bixelPlay.js` at project root) is a standalone JavaScript animation
+player that reads `.bxl` exports. It is kept in sync with the Java animation engine.
+Copy it into any web project alongside a `.bxl` file. See `implement_me.md` for usage.
 
 Do not perform git checkins. Brendan will do that
 
@@ -53,3 +60,4 @@ All three panels implement `ChangeListener` and are registered on `SpriteModel`.
 1. Don't check in to Git or run the app, I will. Please compile it though.
 2. Update the pixel-transforms.txt when updates are made to pixel transforms.
 3. Add to and update a README.txt Make it very simple with instructions to run on Win/Mac/Lin
+4. After any bitClicker build that changes animation features, also run `cp bixelPlay.js web/public/bixelPlay.js`
