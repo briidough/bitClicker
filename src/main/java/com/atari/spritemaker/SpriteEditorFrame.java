@@ -33,7 +33,8 @@ public class SpriteEditorFrame extends JFrame implements ChangeListener {
         PixelPopPanel    popPanel         = new PixelPopPanel(model);
         PixelTwistPanel  twistPanel       = new PixelTwistPanel(model);
         PixelMorphPanel  morphPanel       = new PixelMorphPanel(model);
-        ActionEditsPanel actionEditsPanel = new ActionEditsPanel(model, burstPanel, popPanel, twistPanel, morphPanel);
+        PixelSpringPanel springPanel      = new PixelSpringPanel(model);
+        ActionEditsPanel actionEditsPanel = new ActionEditsPanel(model, burstPanel, popPanel, twistPanel, morphPanel, springPanel);
         actionPanel                       = new ActionPanel(model);
         actionPanel.setActionEditsPanel(actionEditsPanel);
         editorPanel  = new EditorPanel(model);

@@ -62,6 +62,11 @@ public class SpriteModel {
     private int     animWallDamping        = 50;
     private int animMorphSpeedMs = 600;
     private int animMorphHoldMs  = 300;
+    private int animSpringStiffness = 30;
+    private int animSpringDamping   = 30;
+    private int animSpringImpulse   = 40;
+    private int animSpringSpeedMs   = 1400;
+    private int animSpringHoldMs    = 300;
     private final List<ChangeListener> listeners = new ArrayList<>();
     private final List<Runnable> transformListeners = new ArrayList<>();
 
@@ -303,6 +308,17 @@ public class SpriteModel {
     public int  getAnimMorphHoldMs()       { return animMorphHoldMs; }
     public void setAnimMorphHoldMs(int v)  { if (animMorphHoldMs == v) return; animMorphHoldMs = v; fireChange(); fireTransformChange(); }
 
+    public int  getAnimSpringStiffness()      { return animSpringStiffness; }
+    public void setAnimSpringStiffness(int v) { if (animSpringStiffness == v) return; animSpringStiffness = v; fireChange(); fireTransformChange(); }
+    public int  getAnimSpringDamping()        { return animSpringDamping; }
+    public void setAnimSpringDamping(int v)   { if (animSpringDamping == v) return; animSpringDamping = v; fireChange(); fireTransformChange(); }
+    public int  getAnimSpringImpulse()        { return animSpringImpulse; }
+    public void setAnimSpringImpulse(int v)   { if (animSpringImpulse == v) return; animSpringImpulse = v; fireChange(); fireTransformChange(); }
+    public int  getAnimSpringSpeedMs()        { return animSpringSpeedMs; }
+    public void setAnimSpringSpeedMs(int v)   { if (animSpringSpeedMs == v) return; animSpringSpeedMs = v; fireChange(); fireTransformChange(); }
+    public int  getAnimSpringHoldMs()         { return animSpringHoldMs; }
+    public void setAnimSpringHoldMs(int v)    { if (animSpringHoldMs == v) return; animSpringHoldMs = v; fireChange(); fireTransformChange(); }
+
     // ── UFT (Unique Frame Transform) API ─────────────────────────────────────
 
     public void ensureUFTCapacity() {
@@ -349,6 +365,11 @@ public class SpriteModel {
         animMorphFadeDeaths    = s.animMorphFadeDeaths;
         animPopStayAtFocus     = s.animPopStayAtFocus;
         animWallDamping        = s.animWallDamping;
+        animSpringStiffness    = s.animSpringStiffness;
+        animSpringDamping      = s.animSpringDamping;
+        animSpringImpulse      = s.animSpringImpulse;
+        animSpringSpeedMs      = s.animSpringSpeedMs;
+        animSpringHoldMs       = s.animSpringHoldMs;
     }
 
     public void syncSelectedUFT() {

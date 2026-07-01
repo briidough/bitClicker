@@ -50,3 +50,23 @@ Smooth spin sliders (one per half) blend between uniform rotation (0) and a sine
 ramps up from rest, peaks at full speed through the middle of the phase, and decelerates symmetrically back to a stop.
 A Spread checkbox expands a small gap between adjacent pixels so the rotation plane is visually distinct rather than a flat color flip.
 
+--- PIXEL SPRING (JELLY) ---
+Each pixel is tethered to its home cell by a damped spring and settles into place with a
+gelatinous overshoot/wobble. Unlike the other transforms, motion is not a closed-form curve —
+it is integrated frame-by-frame (semi-implicit Euler) by the shared PixelIntegrator using a
+damped-harmonic-oscillator acceleration: accel = -k*(pos - home) - c*velocity.
+Pixels start at the source-frame position with an outward radial impulse (from the Burst focal
+point) and spring toward home. When the source and destination frames have the same pixel count,
+home is the destination shape (so the sprite springs into the next frame); otherwise pixels
+wobble back to their own positions in place.
+Stiffness sets the spring constant k (higher = faster, tighter oscillation).
+Damping is expressed as a percentage of critical damping: 100% settles smoothly with almost no
+overshoot, lower values are bouncier/jellier, and 0% oscillates freely until the duration ends.
+Impulse sets the initial outward kick (0 = pure spring from the source displacement).
+Duration (ms) is how long the effect runs before the next frame; Hold (ms) pauses after it.
+
+--- EASING STYLES ---
+The shared easing library (used by Pixel Burst's Easing dropdown, among others) offers:
+Smooth (quadratic), Sharp (linear), Snappy (quartic), Elastic (spring-like overshoot with
+oscillation), Bounce (ball-drop settle), and Overshoot (single back/overshoot past the target).
+

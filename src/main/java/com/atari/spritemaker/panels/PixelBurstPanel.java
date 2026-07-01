@@ -41,7 +41,7 @@ public class PixelBurstPanel extends JPanel {
         easingLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
         add(easingLbl);
         add(Box.createVerticalStrut(2));
-        comboEasing = new JComboBox<>(new String[]{"Smooth", "Sharp", "Snappy"});
+        comboEasing = new JComboBox<>(new String[]{"Smooth", "Sharp", "Snappy", "Elastic", "Bounce", "Overshoot"});
         comboEasing.setSelectedIndex(model.getAnimEasing());
         comboEasing.setAlignmentX(Component.LEFT_ALIGNMENT);
         comboEasing.setMaximumSize(new Dimension(Integer.MAX_VALUE, comboEasing.getPreferredSize().height));

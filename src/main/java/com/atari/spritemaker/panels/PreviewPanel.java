@@ -298,6 +298,11 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         td.animMorphFadeDeaths = model.isAnimMorphFadeDeaths();
         td.animMorphSpeedMs    = model.getAnimMorphSpeedMs();
         td.animMorphHoldMs     = model.getAnimMorphHoldMs();
+        td.springSpeedMs       = model.getAnimSpringSpeedMs();
+        td.springHoldMs        = model.getAnimSpringHoldMs();
+        td.springK             = model.getAnimSpringStiffness() / 1000f;
+        td.springC             = (model.getAnimSpringDamping() / 100f) * 2f * (float) Math.sqrt(td.springK);
+        td.springImpulse       = model.getAnimSpringImpulse() / 100f;
 
         int gridSize = frames.get(fromIdx).length;
         td.fromPixels = buildPixels(frames.get(fromIdx), gridSize);
@@ -352,7 +357,29 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         if (td.lockedEffectType == 3) {
             buildMorphDataForTransition(frames.get(fromIdx), frames.get(toIdx), gridSize, td);
         }
+        if (td.lockedEffectType == 4) {
+            initSpringState(td);
+        }
         return td;
+    }
+
+    // Seed spring integration: pixels start at fromPixels with a radial outward
+    // impulse and spring toward home (toPixels when pixel counts match, else origin).
+    private void initSpringState(TransitionData td) {
+        int n = td.fromPixels.length;
+        td.springCurX = new float[n];
+        td.springCurY = new float[n];
+        td.springVelX = new float[n];
+        td.springVelY = new float[n];
+        td.springHome = (td.toPixels.length == n) ? td.toPixels : td.fromPixels;
+        int cellSize = CELL * zoomLevel;
+        float impulseMag = td.springImpulse * cellSize * 1.3f;
+        for (int i = 0; i < n; i++) {
+            td.springCurX[i] = td.fromPixels[i][0];
+            td.springCurY[i] = td.fromPixels[i][1];
+            td.springVelX[i] = td.fromDirs[i][0] * impulseMag;
+            td.springVelY[i] = td.fromDirs[i][1] * impulseMag;
+        }
     }
 
     private void startBurst() {
@@ -396,6 +423,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         animProgress = 0f;
         midHoldElapsedMs = 0;
         extendElapsedMs = 0;
+        if (active.lockedEffectType == 4) initSpringState(active); // re-seed on replay
         animating = true;
         burstTimer.start();
     }
@@ -450,6 +478,11 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             delta = 16f * 0.5f / phaseMs;
         } else if (active.lockedEffectType == 3) {
             delta = 16f / Math.max(16, active.animMorphSpeedMs);
+        } else if (active.lockedEffectType == 4) {
+            PixelIntegrator.stepSpring(active.springCurX, active.springCurY,
+                active.springVelX, active.springVelY,
+                active.springHome, active.springK, active.springC, 1f);
+            delta = 16f / Math.max(16, active.springSpeedMs);
         } else {
             delta = 16f / Math.max(16, active.animSpeedMs);
         }
@@ -462,7 +495,9 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             if (uftLoopMode) {
                 // Loop just this transition
                 if (playing) {
-                    int holdMs = active.lockedEffectType == 3 ? active.animMorphHoldMs : active.animHoldMs;
+                    int holdMs = active.lockedEffectType == 3 ? active.animMorphHoldMs
+                               : active.lockedEffectType == 4 ? active.springHoldMs
+                               : active.animHoldMs;
                     pauseTimer.setDelay(Math.max(1, holdMs));
                     pauseTimer.start();
                 }
@@ -470,7 +505,9 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 currentTransitionIdx = (currentTransitionIdx + 1) % N;
                 currentFrameIdx = currentTransitionIdx;
                 if (playing) {
-                    int holdMs = active.lockedEffectType == 3 ? active.animMorphHoldMs : active.animHoldMs;
+                    int holdMs = active.lockedEffectType == 3 ? active.animMorphHoldMs
+                               : active.lockedEffectType == 4 ? active.springHoldMs
+                               : active.animHoldMs;
                     pauseTimer.setDelay(Math.max(1, holdMs));
                     pauseTimer.start();
                 }
@@ -679,10 +716,15 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         if (td.morphTotalWaves < 1) td.morphTotalWaves = 1;
     }
 
+    // Easing styles: 0=smooth(quad), 1=sharp(linear), 2=snappy(quartic),
+    // 3=elastic, 4=bounce, 5=back/overshoot
     private float easingOut(float t, int style) {
         switch (style) {
             case 1: return t;
             case 2: return 1f - (1f-t)*(1f-t)*(1f-t)*(1f-t);
+            case 3: return elasticOut(t);
+            case 4: return bounceOut(t);
+            case 5: return backOut(t);
             default: return 1f - (1f-t)*(1f-t);
         }
     }
@@ -691,8 +733,32 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         switch (style) {
             case 1: return t;
             case 2: return t*t*t*t;
+            case 3: return 1f - elasticOut(1f - t);
+            case 4: return 1f - bounceOut(1f - t);
+            case 5: return 1f - backOut(1f - t);
             default: return t*t;
         }
+    }
+
+    private float elasticOut(float t) {
+        if (t <= 0f) return 0f;
+        if (t >= 1f) return 1f;
+        float p = 0.3f;
+        return (float)(Math.pow(2, -10 * t) * Math.sin((t - p / 4f) * (2 * Math.PI) / p) + 1f);
+    }
+
+    private float bounceOut(float t) {
+        float n1 = 7.5625f, d1 = 2.75f;
+        if (t < 1f / d1)      return n1 * t * t;
+        else if (t < 2f / d1) { t -= 1.5f / d1;  return n1 * t * t + 0.75f; }
+        else if (t < 2.5f / d1) { t -= 2.25f / d1; return n1 * t * t + 0.9375f; }
+        else                  { t -= 2.625f / d1; return n1 * t * t + 0.984375f; }
+    }
+
+    private float backOut(float t) {
+        float c1 = 1.70158f, c3 = c1 + 1f;
+        float u = t - 1f;
+        return 1f + c3 * u * u * u + c1 * u * u;
     }
 
     private float sineEase(float t, float amount) {
@@ -798,6 +864,15 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 g.setColor(new Color(oldP[2]));
                 g.fillRect(oldP[0] + off, oldP[1] + off, oldSize, oldSize);
             }
+        }
+    }
+
+    private void paintPixelSpring(Graphics2D g) {
+        if (active == null || active.springCurX == null) return;
+        int cellSize = CELL * zoomLevel;
+        for (int i = 0; i < active.springCurX.length; i++) {
+            g.setColor(active.fromColors[i]);
+            g.fillRect(Math.round(active.springCurX[i]), Math.round(active.springCurY[i]), cellSize, cellSize);
         }
     }
 
@@ -941,6 +1016,11 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         int animGravityFocalX, animGravityFocalY;
         boolean animMorphFadeDeaths;
         int animMorphSpeedMs, animMorphHoldMs;
+        // Spring (type 4) — mutable integrated state, reset on (re)start
+        float springK, springC, springImpulse;
+        int springSpeedMs, springHoldMs;
+        float[] springCurX, springCurY, springVelX, springVelY;
+        int[][] springHome;
     }
 
     // ── canvas ───────────────────────────────────────────────────────────────
@@ -984,6 +1064,8 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                     paintPixelTwist(g);
                 } else if (active.lockedEffectType == 3) {
                     paintPixelMorph(g);
+                } else if (active.lockedEffectType == 4) {
+                    paintPixelSpring(g);
                 } else {
                     float spread = active.animSpread;
                     int easing = active.animEasing;

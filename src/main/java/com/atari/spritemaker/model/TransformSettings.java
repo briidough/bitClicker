@@ -33,6 +33,11 @@ public class TransformSettings {
     public boolean animMorphFadeDeaths = false;
     public boolean animPopStayAtFocus  = false;
     public int     animWallDamping     = 50;
+    public int     animSpringStiffness = 30;
+    public int     animSpringDamping   = 30;
+    public int     animSpringImpulse   = 40;
+    public int     animSpringSpeedMs   = 1400;
+    public int     animSpringHoldMs    = 300;
 
     public TransformSettings() {}
 
@@ -70,6 +75,11 @@ public class TransformSettings {
         s.animMorphFadeDeaths    = m.isAnimMorphFadeDeaths();
         s.animPopStayAtFocus     = m.isAnimPopStayAtFocus();
         s.animWallDamping        = m.getAnimWallDamping();
+        s.animSpringStiffness    = m.getAnimSpringStiffness();
+        s.animSpringDamping      = m.getAnimSpringDamping();
+        s.animSpringImpulse      = m.getAnimSpringImpulse();
+        s.animSpringSpeedMs      = m.getAnimSpringSpeedMs();
+        s.animSpringHoldMs       = m.getAnimSpringHoldMs();
         return s;
     }
 
@@ -107,6 +117,11 @@ public class TransformSettings {
         s.animMorphFadeDeaths    = animMorphFadeDeaths;
         s.animPopStayAtFocus     = animPopStayAtFocus;
         s.animWallDamping        = animWallDamping;
+        s.animSpringStiffness    = animSpringStiffness;
+        s.animSpringDamping      = animSpringDamping;
+        s.animSpringImpulse      = animSpringImpulse;
+        s.animSpringSpeedMs      = animSpringSpeedMs;
+        s.animSpringHoldMs       = animSpringHoldMs;
         return s;
     }
 }

@@ -43,7 +43,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
 
     // Transform mode
     private JPanel transformModeControls;
-    private JToggleButton btnBurst, btnPop, btnTwist, btnMorph;
+    private JToggleButton btnBurst, btnPop, btnTwist, btnMorph, btnSpring;
     private JLabel uftLabel;
     private ButtonGroup effectGroup;
     private boolean wasTransformMode = false;
@@ -204,23 +204,28 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnPop   = new JToggleButton("Pixel Pop");
         btnTwist = new JToggleButton("Pixel Twist");
         btnMorph = new JToggleButton("Pixel Morph");
+        btnSpring = new JToggleButton("Pixel Spring");
 
         effectGroup = new ButtonGroup();
         effectGroup.add(btnBurst); effectGroup.add(btnPop);
         effectGroup.add(btnTwist); effectGroup.add(btnMorph);
+        effectGroup.add(btnSpring);
 
         btnBurst.addActionListener(e -> { switchTab("burst", 0); revalidateParent(); });
         btnPop  .addActionListener(e -> { switchTab("pop",   1); revalidateParent(); });
         btnTwist.addActionListener(e -> { switchTab("twist", 2); revalidateParent(); });
         btnMorph.addActionListener(e -> { switchTab("morph", 3); revalidateParent(); });
+        btnSpring.addActionListener(e -> { switchTab("spring", 4); revalidateParent(); });
 
         btnBurst.addMouseListener(makeEffectReclick(0, "burst"));
         btnPop  .addMouseListener(makeEffectReclick(1, "pop"));
         btnTwist.addMouseListener(makeEffectReclick(2, "twist"));
         btnMorph.addMouseListener(makeEffectReclick(3, "morph"));
+        btnSpring.addMouseListener(makeEffectReclick(4, "spring"));
 
-        JPanel tabCol = new JPanel(new GridLayout(4, 1, 0, 2));
+        JPanel tabCol = new JPanel(new GridLayout(5, 1, 0, 2));
         tabCol.add(btnBurst); tabCol.add(btnPop); tabCol.add(btnTwist); tabCol.add(btnMorph);
+        tabCol.add(btnSpring);
         tabCol.setAlignmentX(Component.LEFT_ALIGNMENT);
         tabCol.setMaximumSize(new Dimension(Integer.MAX_VALUE, tabCol.getPreferredSize().height));
         transformModeControls.add(tabCol);
@@ -300,8 +305,9 @@ public class ActionPanel extends JPanel implements ChangeListener {
                 btnPop  .setSelected(t == 1);
                 btnTwist.setSelected(t == 2);
                 btnMorph.setSelected(t == 3);
+                btnSpring.setSelected(t == 4);
                 if (actionEditsPanel != null) {
-                    String key = t == 1 ? "pop" : t == 2 ? "twist" : t == 3 ? "morph" : "burst";
+                    String key = t == 1 ? "pop" : t == 2 ? "twist" : t == 3 ? "morph" : t == 4 ? "spring" : "burst";
                     if (!actionEditsPanel.isVisible()) actionEditsPanel.showTransformMode(key);
                     else actionEditsPanel.syncTransformCard();
                 }
@@ -312,6 +318,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
                 btnPop  .setSelected(t == 1);
                 btnTwist.setSelected(t == 2);
                 btnMorph.setSelected(t == 3);
+                btnSpring.setSelected(t == 4);
             }
 
             if (uftLabel != null) {

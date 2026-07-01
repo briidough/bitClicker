@@ -44,16 +44,19 @@ public class ActionEditsPanel extends JPanel implements ChangeListener {
     private final PixelPopPanel    popPanel;
     private final PixelTwistPanel  twistPanel;
     private final PixelMorphPanel  morphPanel;
+    private final PixelSpringPanel springPanel;
 
     public ActionEditsPanel(SpriteModel model,
                              PixelBurstPanel  burstPanel,
                              PixelPopPanel    popPanel,
                              PixelTwistPanel  twistPanel,
-                             PixelMorphPanel  morphPanel) {
+                             PixelMorphPanel  morphPanel,
+                             PixelSpringPanel springPanel) {
         this.burstPanel  = burstPanel;
         this.popPanel    = popPanel;
         this.twistPanel  = twistPanel;
         this.morphPanel  = morphPanel;
+        this.springPanel = springPanel;
         this.model = model;
         setLayout(new BorderLayout());
         Color sepColor = UIManager.getColor("Separator.foreground");
@@ -136,6 +139,9 @@ public class ActionEditsPanel extends JPanel implements ChangeListener {
         transformCardPanel.add(new JScrollPane(morphPanel,
             JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
             JScrollPane.HORIZONTAL_SCROLLBAR_NEVER), "morph");
+        transformCardPanel.add(new JScrollPane(springPanel,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_NEVER), "spring");
 
         cardPanel.add(transformCardPanel, "transform");
         add(cardPanel, BorderLayout.CENTER);
@@ -171,7 +177,7 @@ public class ActionEditsPanel extends JPanel implements ChangeListener {
 
     public void syncTransformCard() {
         int t = model.getAnimEffectType();
-        String key = t == 1 ? "pop" : t == 2 ? "twist" : t == 3 ? "morph" : "burst";
+        String key = t == 1 ? "pop" : t == 2 ? "twist" : t == 3 ? "morph" : t == 4 ? "spring" : "burst";
         transformCardLayout.show(transformCardPanel, key);
     }
 
@@ -185,6 +191,7 @@ public class ActionEditsPanel extends JPanel implements ChangeListener {
         popPanel.refresh();
         twistPanel.refresh();
         morphPanel.refresh();
+        springPanel.refresh();
     }
 
     @Override

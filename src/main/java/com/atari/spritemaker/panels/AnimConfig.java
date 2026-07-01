@@ -51,4 +51,12 @@ public final class AnimConfig {
 
     public static final int MORPH_SPEED_MIN = 100,  MORPH_SPEED_MAX = 3000,  MORPH_SPEED_DEF = 600;
     public static final int MORPH_HOLD_MIN  = 0,    MORPH_HOLD_MAX  = 2000,  MORPH_HOLD_DEF  = 300;
+
+    // ── Pixel Spring / Jelly ──────────────────────────────────────────────────
+    // Stiffness → spring constant k (value/1000). Damping → fraction of critical (value%).
+    public static final int SPRING_STIFFNESS_MIN = 1,   SPRING_STIFFNESS_MAX = 100, SPRING_STIFFNESS_DEF = 30;
+    public static final int SPRING_DAMPING_MIN   = 0,   SPRING_DAMPING_MAX   = 100, SPRING_DAMPING_DEF   = 30;
+    public static final int SPRING_IMPULSE_MIN   = 0,   SPRING_IMPULSE_MAX   = 100, SPRING_IMPULSE_DEF   = 40;
+    public static final int SPRING_SPEED_MIN     = 300, SPRING_SPEED_MAX     = 3000, SPRING_SPEED_DEF    = 1400;
+    public static final int SPRING_HOLD_MIN      = 0,   SPRING_HOLD_MAX      = 2000, SPRING_HOLD_DEF     = 300;
 }
