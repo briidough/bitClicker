@@ -108,6 +108,15 @@ public class BxlExporter {
                 sb.append("        \"fadeDeaths\": ").append(ts.animMorphFadeDeaths).append("\n");
                 sb.append("      }\n");
                 break;
+            case 4:
+                sb.append("      \"spring\": {\n");
+                sb.append("        \"stiffness\": ").append(ts.animSpringStiffness).append(",\n");
+                sb.append("        \"damping\": ").append(ts.animSpringDamping).append(",\n");
+                sb.append("        \"impulse\": ").append(ts.animSpringImpulse).append(",\n");
+                sb.append("        \"speedMs\": ").append(ts.animSpringSpeedMs).append(",\n");
+                sb.append("        \"holdMs\": ").append(ts.animSpringHoldMs).append("\n");
+                sb.append("      }\n");
+                break;
             default: // 0 = burst
                 sb.append("      \"burst\": {\n");
                 sb.append("        \"spread\": ").append(ts.animSpread).append(",\n");

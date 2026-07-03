@@ -126,6 +126,9 @@ class AnimEngine {
       delta = ANIM_TICK_MS * 0.5 / Math.max(16, ms);
     } else if (td.effectType === 3) {
       delta = ANIM_TICK_MS / Math.max(16, ts.morphSpeedMs);
+    } else if (td.effectType === 4) {
+      this._stepSpring(td);
+      delta = ANIM_TICK_MS / Math.max(16, ts.springSpeedMs);
     } else {
       delta = ANIM_TICK_MS / Math.max(16, ts.speedMs);
     }
@@ -145,7 +148,8 @@ class AnimEngine {
       this.frameIdx = this.current;
 
       if (this.playing) {
-        const holdMs = td.effectType === 3 ? ts.morphHoldMs : ts.holdMs;
+        const holdMs = td.effectType === 4 ? ts.springHoldMs
+                     : td.effectType === 3 ? ts.morphHoldMs : ts.holdMs;
         this._holdTimer = setTimeout(() => this._startTransition(), Math.max(1, holdMs));
       }
       return;
@@ -167,6 +171,7 @@ class AnimEngine {
     if (td.effectType === 0)      this._renderBurst(td);
     else if (td.effectType === 1) this._renderPop(td);
     else if (td.effectType === 2) this._renderTwist(td);
+    else if (td.effectType === 4) this._renderSpring(td);
     else                          this._renderMorph(td);
 
     this._setLabel(this.frameIdx);
@@ -246,6 +251,43 @@ class AnimEngine {
     return Array.from({ length: count }, () => 1 + (Math.random() - 0.5) * variance);
   }
 
+  _buildSpringData(td, ts, cs, fp, tp) {
+    const n = fp.length;
+    td.springK  = ts.springStiffness / 1000;
+    td.springC  = (ts.springDamping / 100) * 2 * Math.sqrt(td.springK);
+    td.springX  = new Float32Array(n);
+    td.springY  = new Float32Array(n);
+    td.springVX = new Float32Array(n);
+    td.springVY = new Float32Array(n);
+    td.springHome = (tp.length === n) ? tp : fp;
+    const impulseMag = (ts.springImpulse / 100) * cs * 1.3;
+    for (let i = 0; i < n; i++) {
+      td.springX[i]  = fp[i].x;
+      td.springY[i]  = fp[i].y;
+      td.springVX[i] = td.fromDirs[i].x * impulseMag;
+      td.springVY[i] = td.fromDirs[i].y * impulseMag;
+    }
+  }
+
+  _stepSpring(td) {
+    const home = td.springHome, k = td.springK, c = td.springC;
+    for (let i = 0; i < td.springX.length; i++) {
+      const ax = -k * (td.springX[i] - home[i].x) - c * td.springVX[i];
+      const ay = -k * (td.springY[i] - home[i].y) - c * td.springVY[i];
+      td.springVX[i] += ax; td.springVY[i] += ay;
+      td.springX[i]  += td.springVX[i]; td.springY[i] += td.springVY[i];
+    }
+  }
+
+  _renderSpring(td) {
+    const cs  = this._cs();
+    const ctx = this.ctx;
+    for (let i = 0; i < td.springX.length; i++) {
+      ctx.fillStyle = td.fromPixels[i].color;
+      ctx.fillRect(Math.round(td.springX[i]), Math.round(td.springY[i]), cs, cs);
+    }
+  }
+
   _buildGravDirs(pixels, ts, cs, gs) {
     const totalPx = gs * cs;
     const gx = totalPx * ts.gravityFocalX / 100;
@@ -284,6 +326,7 @@ class AnimEngine {
 
     if (ts.effectType === 1) this._buildPopData(td, ts, cs, gs, fp, tp);
     if (ts.effectType === 3) this._buildMorphData(td, ts, cs, gs, S.frames[fromIdx], S.frames[toIdx]);
+    if (ts.effectType === 4) this._buildSpringData(td, ts, cs, fp, tp);
 
     return td;
   }

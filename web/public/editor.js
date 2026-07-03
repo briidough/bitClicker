@@ -4,19 +4,75 @@
   // ── Constants ─────────────────────────────────────────────────────────────
   const MAX_FRAMES = 6;
   const CELL_SIZE = { 16: 22, 32: 11 };         // px per cell — editor canvas
-  const CHECK_A = '#1e1430';
-  const CHECK_B = '#2a1e44';
-  const GRID_COL = '#2a1e44';
+  // Draw-canvas background is always a plain white / light-grey checkerboard
+  // (independent of the app theme; the preview keeps the theme colors).
+  const CHECK_A = '#ffffff';
+  const CHECK_B = '#d9d9d9';
+  const GRID_COL = '#cccccc';
+
+  // Palette presets: three base colors per theme. Lowlight/highlight are derived.
+  const THEMES = {
+    primary: ['#e23636', '#2ecc40', '#2b7fff'],
+    neon:    ['#ff2d95', '#00fff0', '#39ff14'],
+    sunset:  ['#ff6b35', '#f7548f', '#6a4c93'],
+  };
+  const FIXED_COL = ['#808080', '#000000', '#ffffff']; // grey / black / white
 
   // ── State ─────────────────────────────────────────────────────────────────
   const S = {
     gridSize: 16,
     frames: [],          // Color[][] where Color = null | '#rrggbb'
     current: 0,          // active frame index
-    palette: [],         // 5 slots: '#rrggbb' | null
-    slot: 0,             // active palette slot
+    theme: 'primary',    // primary | neon | sunset | custom
+    baseColors: THEMES.primary.slice(),
+    activeColor: '#000000',
+    erasing: false,
     ts: null,            // global TransformSettings
   };
+
+  // ── Color helpers ───────────────────────────────────────────────────────
+  function hexToHsl(hex) {
+    let r = parseInt(hex.slice(1, 3), 16) / 255;
+    let g = parseInt(hex.slice(3, 5), 16) / 255;
+    let b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return { h, s: s * 100, l: l * 100 };
+  }
+
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) [r, g, b] = [c, x, 0];
+    else if (h < 120) [r, g, b] = [x, c, 0];
+    else if (h < 180) [r, g, b] = [0, c, x];
+    else if (h < 240) [r, g, b] = [0, x, c];
+    else if (h < 300) [r, g, b] = [x, 0, c];
+    else [r, g, b] = [c, 0, x];
+    const to = v => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+    return `#${to(r)}${to(g)}${to(b)}`;
+  }
+
+  function lowlight(hex) {
+    const { h, s, l } = hexToHsl(hex);
+    return hslToHex(h, s, l * 0.6);
+  }
+
+  function highlight(hex) {
+    const { h, s, l } = hexToHsl(hex);
+    return hslToHex(h, s, l + (100 - l) * 0.5);
+  }
 
   // ── Default transform settings (mirrors TransformSettings.java defaults) ──
   function defaultTS() {
@@ -35,6 +91,8 @@
       twistFirstSmooth: 50, twistSecondSmooth: 50,
       twistDirection: 0, twistFullSpin: true, twistSpreadGap: false,
       morphSpeedMs: 600, morphHoldMs: 300, morphFadeDeaths: false,
+      springStiffness: 30, springDamping: 30, springImpulse: 40,
+      springSpeedMs: 1400, springHoldMs: 300,
     };
   }
 
@@ -129,7 +187,6 @@
     renderCanvas();
     renderFrameTabs();
     syncSliders();
-    updatePaletteControls();
   }
 
   function addFrame() {
@@ -149,46 +206,60 @@
   }
 
   // ── Palette ───────────────────────────────────────────────────────────────
+  function pickColor(color) {
+    S.activeColor = color;
+    S.erasing = false;
+    renderPalette();
+  }
+
+  function makeSwatch(color, extraClass, title) {
+    const sw = document.createElement('div');
+    const isActive = !S.erasing && S.activeColor === color;
+    sw.className = 'swatch' + (extraClass ? ' ' + extraClass : '') + (isActive ? ' active' : '');
+    sw.style.background = color;
+    sw.title = title || color;
+    sw.addEventListener('click', () => pickColor(color));
+    return sw;
+  }
+
   function renderPalette() {
     const bar = document.getElementById('paletteBar');
     bar.innerHTML = '';
-    S.palette.forEach((color, i) => {
-      const sw = document.createElement('div');
-      sw.className = 'swatch' + (i === S.slot ? ' active' : '') + (color ? '' : ' empty');
-      if (color) sw.style.background = color;
-      sw.title = `Slot ${i}${i === 0 ? ' (black, fixed)' : color ? ': ' + color : ' (empty)'}`;
-      sw.addEventListener('click', () => {
-        S.slot = i;
-        renderPalette();
-        updatePaletteControls();
+    const b = S.baseColors;
+
+    // Row 0: base colors + grey
+    b.forEach((color, i) => {
+      const sw = makeSwatch(color, 'base', `Base ${i + 1} (right-click to edit)`);
+      sw.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        openBasePicker(i);
       });
       bar.appendChild(sw);
     });
-    updatePaletteControls();
-  }
+    bar.appendChild(makeSwatch(FIXED_COL[0], null, 'Grey'));
 
-  function updatePaletteControls() {
-    const i = S.slot;
-    const color = S.palette[i];
-    const lbl = document.getElementById('slotLabel');
-    const picker = document.getElementById('slotColorPicker');
-    const clearBtn = document.getElementById('clearSlotBtn');
+    // Row 1: lowlights + black
+    b.forEach(color => bar.appendChild(makeSwatch(lowlight(color), null, 'Lowlight')));
+    bar.appendChild(makeSwatch(FIXED_COL[1], null, 'Black'));
 
-    if (i === 0) {
-      lbl.textContent = 'Slot 0 (black)';
-      picker.style.display = 'none';
-      clearBtn.style.display = 'none';
-    } else {
-      lbl.textContent = `Slot ${i}`;
-      picker.style.display = '';
-      picker.value = color || '#ff0000';
-      clearBtn.style.display = color ? '' : 'none';
-    }
+    // Row 2: highlights + white
+    b.forEach(color => bar.appendChild(makeSwatch(highlight(color), null, 'Highlight')));
+    bar.appendChild(makeSwatch(FIXED_COL[2], null, 'White'));
+
+    // Eraser (spans full width)
+    const eraser = document.createElement('button');
+    eraser.className = 'swatch-eraser' + (S.erasing ? ' active' : '');
+    eraser.textContent = 'Eraser';
+    eraser.title = 'Erase pixels';
+    eraser.addEventListener('click', () => {
+      S.erasing = true;
+      renderPalette();
+    });
+    bar.appendChild(eraser);
   }
 
   // ── Canvas events ─────────────────────────────────────────────────────────
   let isPainting = false;
-  let eraseMode = false;
 
   function cellAt(e) {
     const cs = CELL_SIZE[S.gridSize];
@@ -203,10 +274,10 @@
     return { row, col };
   }
 
-  function applyCell(cell, erase) {
+  function applyCell(cell) {
     if (!cell) return;
     const frame = S.frames[S.current];
-    const color = erase ? null : (S.palette[S.slot] || null);
+    const color = S.erasing ? null : (S.activeColor || null);
     if (frame[cell.row][cell.col] === color) return;
     frame[cell.row][cell.col] = color;
     // Fast single-cell redraw on editor canvas
@@ -219,15 +290,15 @@
   }
 
   canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;   // left-click only; erase is a palette button now
     e.preventDefault();
     isPainting = true;
-    eraseMode = e.button === 2;
-    applyCell(cellAt(e), eraseMode);
+    applyCell(cellAt(e));
   });
 
   canvas.addEventListener('mousemove', (e) => {
     if (!isPainting) return;
-    applyCell(cellAt(e), eraseMode);
+    applyCell(cellAt(e));
   });
 
   canvas.addEventListener('mouseup', () => { isPainting = false; });
@@ -246,7 +317,7 @@
 
     const tabs = document.createElement('div');
     tabs.className = 'effect-tabs';
-    ['Burst', 'Pop', 'Twist', 'Morph'].forEach((name, i) => {
+    ['Burst', 'Pop', 'Twist', 'Morph', 'Spring'].forEach((name, i) => {
       const btn = document.createElement('button');
       btn.className = 'btn' + (getActiveTS().effectType === i ? ' active' : '');
       btn.textContent = name;
@@ -262,7 +333,8 @@
     if (et === 0) buildBurstPanel(panel);
     else if (et === 1) buildPopPanel(panel);
     else if (et === 2) buildTwistPanel(panel);
-    else buildMorphPanel(panel);
+    else if (et === 3) buildMorphPanel(panel);
+    else buildSpringPanel(panel);
 
     panel.scrollTop = scrollTop;
   }
@@ -414,6 +486,18 @@
     parent.appendChild(makeToggle('Fade Deaths', 'morphFadeDeaths'));
   }
 
+  function buildSpringPanel(parent) {
+    const sectionLbl = document.createElement('div');
+    sectionLbl.className = 'section-title';
+    sectionLbl.textContent = 'Spring settings';
+    parent.appendChild(sectionLbl);
+    parent.appendChild(makeSlider('Stiffness', 'springStiffness', 1, 100));
+    parent.appendChild(makeSlider('Damping (% critical)', 'springDamping', 0, 100));
+    parent.appendChild(makeSlider('Impulse', 'springImpulse', 0, 100));
+    parent.appendChild(makeSlider('Duration (ms)', 'springSpeedMs', 300, 3000, 50));
+    parent.appendChild(makeSlider('Hold (ms)', 'springHoldMs', 0, 2000, 50));
+  }
+
   function syncSliders() {
     const ts = getActiveTS();
     document.querySelectorAll('.ts-slider').forEach(sl => {
@@ -508,18 +592,7 @@
     S.frames = resized.slice(0, MAX_FRAMES);
     S.current = 0;
 
-    // Infer palette from first frame's unique colors
-    const seen = new Set();
-    S.frames[0].forEach(row => row.forEach(c => {
-      if (c && c.toLowerCase() !== '#000000') seen.add(c.toLowerCase());
-    }));
-    const cols = [...seen].slice(0, 4);
-    S.palette = ['#000000', ...cols, ...Array(4 - cols.length).fill(null)];
-    S.slot = 0;
-
-    // Update size buttons UI
-    document.querySelectorAll('.size-btn').forEach(b =>
-      b.classList.toggle('active', parseInt(b.dataset.size, 10) === S.gridSize));
+    updateSizeChecks();
 
     if (engine) engine.stop();
     renderAll();
@@ -588,17 +661,79 @@
     buildTransformPanel();
   }
 
+  // ── Size options (in Whatnot menu) ────────────────────────────────────────
+  function updateSizeChecks() {
+    document.querySelectorAll('.size-opt').forEach(b =>
+      b.classList.toggle('active', parseInt(b.dataset.size, 10) === S.gridSize));
+  }
+
+  // ── Base color picker (right-click a base swatch) ─────────────────────────
+  let editingBase = -1;
+  function openBasePicker(i) {
+    editingBase = i;
+    const picker = document.getElementById('baseColorPicker');
+    picker.value = S.baseColors[i];
+    picker.click();
+  }
+
+  // ── Resizable outer frame (drag the frame edge) ───────────────────────────
+  function initFrameResize() {
+    const root = document.documentElement;
+    let dragging = false;
+    document.body.addEventListener('mousedown', (e) => {
+      if (e.target !== document.body) return; // only the frame/padding region
+      dragging = true;
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      // Frame thickness = cursor distance from the nearest viewport edge.
+      const d = Math.min(e.clientX, e.clientY,
+                         window.innerWidth - e.clientX,
+                         window.innerHeight - e.clientY);
+      root.style.setProperty('--frame-w', Math.max(0, Math.min(60, d)) + 'px');
+    });
+    window.addEventListener('mouseup', () => { dragging = false; });
+  }
+
+  // ── Resizable preview panel (drag either edge, up to +100px per side) ─────
+  function initPreviewResize() {
+    const root = document.documentElement;
+    function drag(handleId, cssVar, sign) {
+      const handle = document.getElementById(handleId);
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const start = parseFloat(getComputedStyle(root).getPropertyValue(cssVar)) || 0;
+        function onMove(ev) {
+          const delta = (ev.clientX - startX) * sign;
+          root.style.setProperty(cssVar, Math.max(0, Math.min(100, start + delta)) + 'px');
+        }
+        function onUp() {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+        }
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+    }
+    drag('previewResizeLeft', '--preview-extra-l', -1); // drag left = wider
+    drag('previewResizeRight', '--preview-extra-r', 1); // drag right = wider
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
   function init() {
     S.gridSize = 16;
     S.frames = [newGrid(16)];
     S.current = 0;
-    S.palette = ['#000000', null, null, null, null];
-    S.slot = 0;
+    S.theme = 'primary';
+    S.baseColors = THEMES.primary.slice();
+    S.activeColor = '#000000';
+    S.erasing = false;
     S.ts = defaultTS();
 
-    // Grid size buttons
-    document.querySelectorAll('.size-btn').forEach(btn => {
+    // Grid size options (inside Whatnot menu)
+    document.querySelectorAll('.size-opt').forEach(btn => {
       btn.addEventListener('click', () => {
         const newSize = parseInt(btn.dataset.size, 10);
         if (newSize === S.gridSize) return;
@@ -607,11 +742,11 @@
         S.frames = [newGrid(newSize)];
         S.current = 0;
         if (engine) engine.stop();
-        document.querySelectorAll('.size-btn').forEach(b =>
-          b.classList.toggle('active', parseInt(b.dataset.size, 10) === newSize));
+        updateSizeChecks();
         renderAll();
       });
     });
+    updateSizeChecks();
 
     // File menu
     const menuBtn = document.getElementById('fileMenuBtn');
@@ -639,22 +774,22 @@
 
     document.getElementById('cmdSave').addEventListener('click', saveSga);
 
-    // Slot color picker
-    const picker = document.getElementById('slotColorPicker');
-    picker.addEventListener('input', () => {
-      if (S.slot > 0) {
-        S.palette[S.slot] = picker.value;
-        renderPalette();
-      }
+    // Palette theme dropdown
+    const themeSelect = document.getElementById('themeSelect');
+    themeSelect.addEventListener('change', () => {
+      S.theme = themeSelect.value;
+      if (THEMES[S.theme]) S.baseColors = THEMES[S.theme].slice();
+      renderPalette();
     });
 
-    // Clear slot
-    document.getElementById('clearSlotBtn').addEventListener('click', () => {
-      if (S.slot > 0) {
-        S.palette[S.slot] = null;
-        S.slot = 0;
-        renderPalette();
-      }
+    // Base color picker (custom): recompute lowlight/highlight from the new base
+    const basePicker = document.getElementById('baseColorPicker');
+    basePicker.addEventListener('input', () => {
+      if (editingBase < 0) return;
+      S.baseColors[editingBase] = basePicker.value;
+      S.theme = 'custom';
+      themeSelect.value = 'custom';
+      renderPalette();
     });
 
     // Clear frame
@@ -663,6 +798,10 @@
       S.frames[S.current] = newGrid(S.gridSize);
       renderCanvas();
     });
+
+    // Outer frame + preview resize handles
+    initFrameResize();
+    initPreviewResize();
 
     // Preview controls
     engine = new AnimEngine(() => S, previewCanvas);

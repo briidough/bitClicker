@@ -183,6 +183,9 @@ class BixelPlay {
       delta = _BX_TICK_MS * 0.5 / Math.max(16, ms);
     } else if (td.effectType === 3) {
       delta = _BX_TICK_MS / Math.max(16, ts.morphSpeedMs);
+    } else if (td.effectType === 4) {
+      this._stepSpring(td, ts);
+      delta = _BX_TICK_MS / Math.max(16, ts.springSpeedMs);
     } else {
       delta = _BX_TICK_MS / Math.max(16, ts.speedMs);
     }
@@ -240,7 +243,17 @@ class BixelPlay {
     if      (td.effectType === 0) this._renderBurst(td);
     else if (td.effectType === 1) this._renderPop(td);
     else if (td.effectType === 2) this._renderTwist(td);
+    else if (td.effectType === 4) this._renderSpring(td);
     else                          this._renderMorph(td);
+  }
+
+  _renderSpring(td) {
+    const cs  = this.pixelSize;
+    const ctx = this.ctx;
+    for (let i = 0; i < td.springX.length; i++) {
+      ctx.fillStyle = td.fromPixels[i].color;
+      ctx.fillRect(Math.round(td.springX[i]), Math.round(td.springY[i]), cs, cs);
+    }
   }
 
   // ── TD builder ────────────────────────────────────────────────────────────
@@ -283,6 +296,8 @@ class BixelPlay {
     if (ts.effectType === 3)
       this._buildMorphData(td, ts, cs, gs,
         this.data.frames[fromIdx], this.data.frames[toIdx]);
+    if (ts.effectType === 4)
+      this._buildSpringData(td, ts, cs, fp, tp);
 
     return td;
   }
@@ -314,12 +329,19 @@ class BixelPlay {
       ts.twistFirstSmooth = tw.firstSmooth; ts.twistSecondSmooth = tw.secondSmooth;
       ts.twistDirection = tw.direction; ts.twistFullSpin = tw.fullSpin;
       ts.twistSpreadGap = tw.spreadGap;
-    } else {
+    } else if (type === 3) {
       const m = trans.morph;
       ts.morphSpeedMs = m.speedMs; ts.morphHoldMs = m.holdMs;
       ts.focalX = m.focalX; ts.focalY = m.focalY;
       ts.morphFadeDeaths = m.fadeDeaths;
       ts.holdMs = m.holdMs || 0;
+    } else if (type === 4) {
+      const sp = trans.spring;
+      ts.springK         = sp.stiffness / 1000;
+      ts.springC         = (sp.damping / 100) * 2 * Math.sqrt(ts.springK);
+      ts.springImpulse01 = sp.impulse / 100;
+      ts.springSpeedMs   = sp.speedMs;
+      ts.holdMs          = sp.holdMs || 0;
     }
     return ts;
   }
@@ -355,6 +377,32 @@ class BixelPlay {
 
   _buildSpeeds(count, variance) {
     return Array.from({ length: count }, () => 1 + (Math.random() - 0.5) * variance);
+  }
+
+  _buildSpringData(td, ts, cs, fp, tp) {
+    const n = fp.length;
+    td.springX = new Float32Array(n);
+    td.springY = new Float32Array(n);
+    td.springVX = new Float32Array(n);
+    td.springVY = new Float32Array(n);
+    td.springHome = (tp.length === n) ? tp : fp;
+    const impulseMag = ts.springImpulse01 * cs * 1.3;
+    for (let i = 0; i < n; i++) {
+      td.springX[i]  = fp[i].x;
+      td.springY[i]  = fp[i].y;
+      td.springVX[i] = td.fromDirs[i].x * impulseMag;
+      td.springVY[i] = td.fromDirs[i].y * impulseMag;
+    }
+  }
+
+  _stepSpring(td, ts) {
+    const home = td.springHome, k = ts.springK, c = ts.springC;
+    for (let i = 0; i < td.springX.length; i++) {
+      const ax = -k * (td.springX[i] - home[i].x) - c * td.springVX[i];
+      const ay = -k * (td.springY[i] - home[i].y) - c * td.springVY[i];
+      td.springVX[i] += ax; td.springVY[i] += ay;
+      td.springX[i]  += td.springVX[i]; td.springY[i] += td.springVY[i];
+    }
   }
 
   _buildGravDirs(pixels, ts, cs, gs) {
