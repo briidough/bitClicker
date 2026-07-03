@@ -14,8 +14,8 @@
   --danger:      #e94560;
   --frame-w:     10px;
   --frame-color: #5a3a90;
-  --preview-extra-l: 0px;
-  --preview-extra-r: 0px;
+  --preview-w: 210px;
+  --collapsed-bias: 0px;
   --grid-glow:    rgba(90,58,144,0.4);
   --preview-glow: rgba(0,229,255,0.12);
 }
@@ -180,6 +180,13 @@ body {
   flex: 1;
   overflow: hidden;
   min-height: 0;
+}
+
+.editor-col,
+.preview-col,
+.transform-col {
+  transition: flex-grow .28s ease, flex-basis .28s ease,
+              min-width .28s ease, width .28s ease, opacity .2s ease;
 }
 
 /* ── Editor column ───────────────────────────────────────────────── */
@@ -502,21 +509,24 @@ input[type="color"] {
   border-left: 1px solid var(--border-hi);
   border-right: 1px solid var(--border-hi);
   flex: 0 0 auto;
-  width: calc(210px + var(--preview-extra-l) + var(--preview-extra-r));
+  width: var(--preview-w);
 }
 
 .preview-resize {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 6px;
+  width: 10px;
   cursor: ew-resize;
   z-index: 5;
+  background: var(--fg-accent);
+  opacity: 0.12;
 }
 
 .preview-resize.left  { left: 0; }
 .preview-resize.right { right: 0; }
-.preview-resize:hover { background: var(--fg-accent); opacity: 0.4; }
+.preview-resize:hover,
+.preview-resize:active { opacity: 0.4; }
 
 .panel-title {
   font-size: 10px;
@@ -563,6 +573,61 @@ input[type="color"] {
   border-color: var(--fg-accent);
   color: var(--fg-accent);
 }
+
+/* ── Responsive: bottom tabs + collapsed layout ──────────────────── */
+.mode-tabs { display: none; }
+
+.mode-tab {
+  flex: 1;
+  padding: 10px;
+  background: var(--bg-dark);
+  border: none;
+  border-top: 1px solid var(--border-hi);
+  color: var(--fg-text);
+  font: inherit;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mode-tab.active {
+  color: var(--fg-accent);
+  background: var(--bg-mid);
+}
+
+.app.collapsed .mode-tabs { display: flex; }
+
+/* preview flexes to fill; ~50% + nudge, instead of its fixed width */
+.app.collapsed .preview-col {
+  flex: 0 1 calc(50% + var(--collapsed-bias));
+  width: auto;
+}
+
+/* side panels lose their min-width so they can squeeze to 0 */
+.app.collapsed .editor-col,
+.app.collapsed .transform-col { min-width: 0; }
+
+/* the inactive side panel squeezes shut */
+.app.collapsed.mode-draw .transform-col,
+.app.collapsed.mode-transform .editor-col {
+  flex: 0 0 0;
+  min-width: 0;
+  width: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border: 0;
+}
+
+/* the active side panel takes the other ~50% (minus the nudge) */
+.app.collapsed.mode-draw .editor-col,
+.app.collapsed.mode-transform .transform-col {
+  flex: 0 1 calc(50% - var(--collapsed-bias));
+}
+
+/* draw canvas scales down to fit the narrow column */
+.app.collapsed #grid { max-width: 100%; height: auto; }
 
 /* ── Scrollbar ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

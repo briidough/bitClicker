@@ -12,8 +12,9 @@
 Hello and welcome to bitclicker
 
 bitClicker is a pixel sprite and animation editor.
-Start on a 16×16 grid, or size the canvas up when you need more room.
-Paint from a 3×3 palette — 3 colors with 3 shades each, 9 in total — and pick whichever palette you like, including the classic Atari NTSC, PAL, and SECAM sets.
+Canvas 16x16 and 32x32 on web, 16 up to 80 on desktop
+Preset color paletes.
+For web, when custom, 
 Build multi-frame animations with pixel transforms like Pop, Morph, Burst, and Spring
 Runs anywhere with Java 11+ — no extra dependencies, just Swing.
 

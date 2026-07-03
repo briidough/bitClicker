@@ -747,18 +747,28 @@
     window.addEventListener('mouseup', () => { dragging = false; });
   }
 
-  // ── Resizable preview panel (drag either edge, up to +100px per side) ─────
+  // ── Resizable preview panel (grab either edge bar) ────────────────────────
+  // Normal layout: drag resizes total preview width, clamped 66%–150% of 210px.
+  // Collapsed layout: drag nudges the 50/50 split ±50px via --collapsed-bias.
   function initPreviewResize() {
     const root = document.documentElement;
-    function drag(handleId, cssVar, sign) {
+    const app = document.querySelector('.app');
+    const BASE = 210, MIN = Math.round(BASE * 0.66), MAX = Math.round(BASE * 1.5); // 139 / 315
+    function drag(handleId, sign) {
       const handle = document.getElementById(handleId);
       handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         const startX = e.clientX;
-        const start = parseFloat(getComputedStyle(root).getPropertyValue(cssVar)) || 0;
+        const collapsed = app.classList.contains('collapsed');
+        const cssVar = collapsed ? '--collapsed-bias' : '--preview-w';
+        const start = parseFloat(getComputedStyle(root).getPropertyValue(cssVar))
+                      || (collapsed ? 0 : BASE);
         function onMove(ev) {
-          const delta = (ev.clientX - startX) * sign;
-          root.style.setProperty(cssVar, Math.max(0, Math.min(100, start + delta)) + 'px');
+          const delta = (ev.clientX - startX) * sign;   // grow when dragging outward
+          const next = collapsed
+            ? Math.max(-50, Math.min(50, start + delta))
+            : Math.max(MIN, Math.min(MAX, start + delta));
+          root.style.setProperty(cssVar, next + 'px');
         }
         function onUp() {
           window.removeEventListener('mousemove', onMove);
@@ -768,8 +778,29 @@
         window.addEventListener('mouseup', onUp);
       });
     }
-    drag('previewResizeLeft', '--preview-extra-l', -1); // drag left = wider
-    drag('previewResizeRight', '--preview-extra-r', 1); // drag right = wider
+    drag('previewResizeLeft', -1);  // drag left = wider
+    drag('previewResizeRight', 1);  // drag right = wider
+  }
+
+  // ── Responsive collapse + Draw/Transform tabs (narrow screens) ────────────
+  function initResponsive() {
+    const app = document.querySelector('.app');
+    const mq = window.matchMedia('(max-width: 640px)');
+    function setMode(mode) {                 // 'draw' | 'transform'
+      app.classList.toggle('mode-draw', mode === 'draw');
+      app.classList.toggle('mode-transform', mode === 'transform');
+      document.querySelectorAll('.mode-tab').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === mode));
+    }
+    function apply() {
+      app.classList.toggle('collapsed', mq.matches);
+      if (mq.matches && !app.classList.contains('mode-draw')
+                     && !app.classList.contains('mode-transform')) setMode('draw');
+    }
+    document.querySelectorAll('.mode-tab').forEach(btn =>
+      btn.addEventListener('click', () => setMode(btn.dataset.mode)));
+    mq.addEventListener('change', apply);
+    apply();
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
@@ -857,6 +888,7 @@
     // Outer frame + preview resize handles
     initFrameResize();
     initPreviewResize();
+    initResponsive();
 
     // Preview controls
     engine = new AnimEngine(() => S, previewCanvas);
