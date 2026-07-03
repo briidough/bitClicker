@@ -5,9 +5,12 @@
 const ANIM_TICK_MS   = 16;   // ~60 fps
 const TWIST_SPREAD   = 10;   // AnimConfig.TWIST_SPREAD_DEF
 const PREVIEW_CS     = { 16: 12, 32: 6 };  // px per cell on preview canvas
-const CHECK_A_ANIM   = '#1e1430';
-const CHECK_B_ANIM   = '#2a1e44';
-const BG_ANIM        = '#1a1228';
+
+// Preview bg/checkerboard colors follow the active UI theme's CSS variables.
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
 
 class AnimEngine {
   constructor(getState, canvas) {
@@ -26,6 +29,15 @@ class AnimEngine {
 
     this._tickTimer = null;
     this._holdTimer = null;
+
+    this.refreshTheme();
+  }
+
+  // Re-read preview colors from the active UI theme (called on theme switch).
+  refreshTheme() {
+    this.checkA = cssVar('--check-a', '#1e1430');
+    this.checkB = cssVar('--check-b', '#2a1e44');
+    this.bg     = cssVar('--bg-dark', '#1a1228');
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -68,7 +80,7 @@ class AnimEngine {
     const ctx   = this.ctx;
     for (let r = 0; r < S.gridSize; r++) {
       for (let c = 0; c < S.gridSize; c++) {
-        ctx.fillStyle = frame[r][c] || ((r + c) % 2 === 0 ? CHECK_A_ANIM : CHECK_B_ANIM);
+        ctx.fillStyle = frame[r][c] || ((r + c) % 2 === 0 ? this.checkA : this.checkB);
         ctx.fillRect(c * cs, r * cs, cs, cs);
       }
     }
@@ -165,7 +177,7 @@ class AnimEngine {
     const cs  = this._cs();
     this._setupCanvas();
     const ctx = this.ctx;
-    ctx.fillStyle = BG_ANIM;
+    ctx.fillStyle = this.bg;
     ctx.fillRect(0, 0, S.gridSize * cs, S.gridSize * cs);
 
     if (td.effectType === 0)      this._renderBurst(td);
@@ -623,7 +635,7 @@ class AnimEngine {
     td.morphDeaths.forEach(p => {
       const drawSz = Math.round(cs * (1 - t));
       if (drawSz <= 0) return;
-      ctx.fillStyle = BG_ANIM;
+      ctx.fillStyle = this.bg;
       ctx.fillRect(p.x, p.y, cs, cs);
       const off = (cs - drawSz) / 2;
       if (td.ts.morphFadeDeaths) {

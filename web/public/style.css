@@ -16,6 +16,26 @@
   --frame-color: #5a3a90;
   --preview-extra-l: 0px;
   --preview-extra-r: 0px;
+  --grid-glow:    rgba(90,58,144,0.4);
+  --preview-glow: rgba(0,229,255,0.12);
+}
+
+:root[data-theme="sky"] {          /* Clear Day — light */
+  --bg-darkest:#cfe8fb; --bg-dark:#e4f2fd; --bg-mid:#f4faff;
+  --fg-text:#1a3a5c; --fg-accent:#0088cc; --fg-selected:#ff8a3d;
+  --border-hi:#7fb8e6; --border-lo:#9cc4e4; --grid-line:#bcd8ef;
+  --check-a:#eef6fd; --check-b:#dcebf8; --danger:#e23b52;
+  --frame-color:#7fb8e6;
+  --grid-glow:rgba(0,136,204,0.25); --preview-glow:rgba(0,136,204,0.18);
+}
+
+:root[data-theme="industrial"] {   /* Gunmetal — cool dark */
+  --bg-darkest:#0f1214; --bg-dark:#191e22; --bg-mid:#262e34;
+  --fg-text:#c4ccd2; --fg-accent:#6bb0c9; --fg-selected:#ff4438;
+  --border-hi:#3c4750; --border-lo:#060809; --grid-line:#222a30;
+  --check-a:#161b1f; --check-b:#1f262b; --danger:#ff4438;
+  --frame-color:#3c4750;
+  --grid-glow:rgba(107,176,201,0.30); --preview-glow:rgba(107,176,201,0.15);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -100,14 +120,14 @@ body {
   margin: 3px 0;
 }
 
-.size-opt .check {
+.size-opt .check, .theme-opt .check {
   display: inline-block;
   width: 14px;
   color: var(--fg-accent);
   opacity: 0;
 }
 
-.size-opt.active .check { opacity: 1; }
+.size-opt.active .check, .theme-opt.active .check { opacity: 1; }
 
 /* ── Buttons ─────────────────────────────────────────────────────── */
 .btn {
@@ -174,6 +194,7 @@ body {
   border-right: 1px solid var(--border-hi);
   flex: 1 1 0;
   min-width: 260px;
+  position: relative;
 }
 
 /* ── Frame tabs ──────────────────────────────────────────────────── */
@@ -203,17 +224,69 @@ body {
   border-color: var(--fg-accent);
 }
 
-.frame-tab-del {
+.del-frame-btn {
   background: none;
-  border: none;
+  border: 1px dashed var(--danger);
   color: var(--danger);
-  font-size: 11px;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 0 8px 2px;
   cursor: pointer;
-  padding: 0 2px;
   line-height: 1;
 }
 
-.frame-tab-del:hover { color: #fff; }
+.del-frame-btn:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ── Delete-frame confirm popup (centered over draw panel) ───────── */
+.frame-del-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 200;
+}
+
+.frame-del-dialog {
+  background: var(--bg-darkest);
+  border: 1px solid var(--border-hi);
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.6);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 180px;
+}
+
+.frame-del-msg {
+  color: var(--fg-text);
+  font-size: 14px;
+}
+
+.frame-del-btns {
+  display: flex;
+  gap: 16px;
+}
+
+.frame-del-yes,
+.frame-del-no {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 18px;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+}
+
+.frame-del-yes { background: #3ca03c; }
+.frame-del-yes:hover { background: #4bbf4b; }
+.frame-del-no  { background: #be3232; }
+.frame-del-no:hover  { background: #d84343; }
 
 .add-frame-btn {
   background: none;
@@ -237,7 +310,7 @@ body {
   image-rendering: pixelated;
   border: 1px solid var(--border-hi);
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg transform='translate(1 22) rotate(-45 0 0)'%3E%3Crect x='-3' y='-4' width='6' height='14' fill='%23ffcc00' stroke='%23000' stroke-width='1'/%3E%3Cpolygon points='-3,10 3,10 0,17' fill='%23f4a460' stroke='%23000' stroke-width='1'/%3E%3Cpolygon points='-1.2,15 1.2,15 0,17' fill='%23000'/%3E%3Crect x='-3' y='-6' width='6' height='2' fill='%23ff69b4' stroke='%23000' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E") 1 22, crosshair;
-  box-shadow: 0 0 12px rgba(90,58,144,0.4);
+  box-shadow: 0 0 12px var(--grid-glow);
   align-self: center;
 }
 
@@ -461,7 +534,7 @@ input[type="color"] {
   display: block;
   image-rendering: pixelated;
   border: 1px solid var(--border-hi);
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.12);
+  box-shadow: 0 0 10px var(--preview-glow);
 }
 
 .preview-frame-label {

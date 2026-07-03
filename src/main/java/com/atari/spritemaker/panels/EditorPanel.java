@@ -305,6 +305,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
         private final ButtonGroup tabGroup = new ButtonGroup();
         private final JToggleButton allBtn;
         private final JButton addBtn;
+        private final JButton delBtn;
 
         FrameTabBar() {
             setLayout(new FlowLayout(FlowLayout.LEFT, 2, 2));
@@ -337,6 +338,16 @@ public class EditorPanel extends JPanel implements ChangeListener {
             addBtn.setMargin(new Insets(1, 2, 1, 2));
             addBtn.addActionListener(e -> model.addFrame());
 
+            delBtn = new JButton("✕");
+            delBtn.setPreferredSize(new Dimension(28, 22));
+            delBtn.setMargin(new Insets(1, 2, 1, 2));
+            delBtn.setForeground(Color.RED);
+            delBtn.setToolTipText("Delete current frame");
+            delBtn.addActionListener(e -> {
+                int idx = model.getCurrentFrameIndex();
+                if (confirmDeleteFrame(idx + 1)) model.deleteFrame(idx);
+            });
+
             refresh();
         }
 
@@ -365,6 +376,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
             if (!isTransform) {
                 if (N < MAX_FRAMES) add(addBtn);
             }
+            if (N > 1) add(delBtn);
 
             // Sync ButtonGroup selection
             if (isTransform && selectedUFT >= 0) {
@@ -378,6 +390,41 @@ public class EditorPanel extends JPanel implements ChangeListener {
 
             revalidate();
             repaint();
+        }
+
+        private boolean confirmDeleteFrame(int frameNumber) {
+            Window owner = SwingUtilities.getWindowAncestor(this);
+            JDialog dialog = new JDialog(owner, "Delete Frame?", Dialog.ModalityType.APPLICATION_MODAL);
+            final boolean[] result = {false};
+
+            JLabel msg = new JLabel("Delete Frame " + frameNumber + "?", SwingConstants.CENTER);
+            msg.setBorder(BorderFactory.createEmptyBorder(18, 24, 12, 24));
+
+            JButton yes = new JButton("Yes.");
+            yes.setBackground(new Color(60, 160, 60));
+            yes.setForeground(Color.WHITE);
+            yes.setOpaque(true);
+            yes.setBorderPainted(false);
+            yes.addActionListener(e -> { result[0] = true; dialog.dispose(); });
+
+            JButton no = new JButton("No!");
+            no.setBackground(new Color(190, 50, 50));
+            no.setForeground(Color.WHITE);
+            no.setOpaque(true);
+            no.setBorderPainted(false);
+            no.addActionListener(e -> { result[0] = false; dialog.dispose(); });
+
+            JPanel buttons = new JPanel(new FlowLayout(FlowLayout.CENTER, 16, 12));
+            buttons.add(yes);
+            buttons.add(no);
+
+            dialog.setLayout(new BorderLayout());
+            dialog.add(msg, BorderLayout.CENTER);
+            dialog.add(buttons, BorderLayout.SOUTH);
+            dialog.pack();
+            dialog.setLocationRelativeTo(owner);
+            dialog.setVisible(true);
+            return result[0];
         }
     }
 }

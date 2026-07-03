@@ -21,6 +21,7 @@
   // ── State ─────────────────────────────────────────────────────────────────
   const S = {
     gridSize: 16,
+    uiTheme: 'purply',   // purply | sky | industrial — the app UI theme (separate from palette theme)
     frames: [],          // Color[][] where Color = null | '#rrggbb'
     current: 0,          // active frame index
     theme: 'primary',    // primary | neon | sunset | custom
@@ -157,18 +158,6 @@
       tab.className = 'frame-tab' + (fi === S.current ? ' active' : '');
       tab.textContent = `F${fi + 1}`;
       tab.addEventListener('click', () => switchFrame(fi));
-
-      if (S.frames.length > 1) {
-        const del = document.createElement('button');
-        del.className = 'frame-tab-del';
-        del.title = 'Delete frame';
-        del.textContent = '×';
-        del.addEventListener('click', (e) => {
-          e.stopPropagation();
-          deleteFrame(fi);
-        });
-        tab.appendChild(del);
-      }
       bar.appendChild(tab);
     });
 
@@ -179,6 +168,15 @@
       add.textContent = '+';
       add.addEventListener('click', addFrame);
       bar.appendChild(add);
+    }
+
+    if (S.frames.length > 1) {
+      const del = document.createElement('button');
+      del.className = 'del-frame-btn';
+      del.title = 'Delete current frame';
+      del.textContent = '✕';
+      del.addEventListener('click', () => deleteFrame(S.current));
+      bar.appendChild(del);
     }
   }
 
@@ -196,13 +194,51 @@
     renderAll();
   }
 
-  function deleteFrame(fi) {
+  async function deleteFrame(fi) {
     if (S.frames.length <= 1) return;
-    if (!confirm(`Delete frame ${fi + 1}?`)) return;
+    if (!(await confirmDeleteFrame(fi + 1))) return;
     S.frames.splice(fi, 1);
     if (S.current >= S.frames.length) S.current = S.frames.length - 1;
     if (engine) engine.stop();
     renderAll();
+  }
+
+  function confirmDeleteFrame(frameNumber) {
+    return new Promise((resolve) => {
+      const host = document.querySelector('.editor-col');
+      const overlay = document.createElement('div');
+      overlay.className = 'frame-del-overlay';
+
+      const dialog = document.createElement('div');
+      dialog.className = 'frame-del-dialog';
+
+      const msg = document.createElement('div');
+      msg.className = 'frame-del-msg';
+      msg.textContent = `Delete Frame ${frameNumber}?`;
+
+      const btnRow = document.createElement('div');
+      btnRow.className = 'frame-del-btns';
+
+      const yes = document.createElement('button');
+      yes.className = 'frame-del-yes';
+      yes.textContent = 'Yes.';
+
+      const no = document.createElement('button');
+      no.className = 'frame-del-no';
+      no.textContent = 'No!';
+
+      const close = (val) => { overlay.remove(); resolve(val); };
+      yes.addEventListener('click', () => close(true));
+      no.addEventListener('click', () => close(false));
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+
+      btnRow.appendChild(yes);
+      btnRow.appendChild(no);
+      dialog.appendChild(msg);
+      dialog.appendChild(btnRow);
+      overlay.appendChild(dialog);
+      host.appendChild(overlay);
+    });
   }
 
   // ── Palette ───────────────────────────────────────────────────────────────
@@ -667,6 +703,21 @@
       b.classList.toggle('active', parseInt(b.dataset.size, 10) === S.gridSize));
   }
 
+  // ── UI theme options (in Whatnot menu) ────────────────────────────────────
+  function updateThemeChecks() {
+    document.querySelectorAll('.theme-opt').forEach(b =>
+      b.classList.toggle('active', b.dataset.theme === S.uiTheme));
+  }
+  function applyTheme(name) {
+    S.uiTheme = name;
+    if (name === 'purply') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', name);
+    try { localStorage.setItem('bcw-ui-theme', name); } catch (e) {}
+    updateThemeChecks();
+    if (engine && engine.refreshTheme) engine.refreshTheme();
+    renderAll();
+  }
+
   // ── Base color picker (right-click a base swatch) ─────────────────────────
   let editingBase = -1;
   function openBasePicker(i) {
@@ -748,6 +799,10 @@
     });
     updateSizeChecks();
 
+    // UI theme options (inside Whatnot menu)
+    document.querySelectorAll('.theme-opt').forEach(btn =>
+      btn.addEventListener('click', () => applyTheme(btn.dataset.theme)));
+
     // File menu
     const menuBtn = document.getElementById('fileMenuBtn');
     const dropdown = document.getElementById('fileDropdown');
@@ -809,6 +864,7 @@
     document.getElementById('previewStep').addEventListener('click', () => engine.step());
     document.getElementById('previewPlay').addEventListener('click', () => engine.play());
 
+    applyTheme(localStorage.getItem('bcw-ui-theme') || 'purply');
     renderAll();
   }
 

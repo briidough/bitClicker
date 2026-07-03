@@ -223,6 +223,40 @@ public class SpriteModel {
         fireChange();
     }
 
+    public void deleteFrame(int index) {
+        if (animationFrames.size() <= 1) return;
+        if (index < 0 || index >= animationFrames.size()) return;
+
+        frameBackgrounds.set(currentFrameIndex, bgImage);
+        animationFrames.remove(index);
+        frameBackgrounds.remove(index);
+
+        // Drop the deleted frame's transform and shift the rest down.
+        if (index < uftSettings.size()) uftSettings.remove(index);
+        Set<Integer> shifted = new HashSet<>();
+        for (int e : uftEnabled) {
+            if (e < index) shifted.add(e);
+            else if (e > index) shifted.add(e - 1);
+        }
+        uftEnabled.clear();
+        uftEnabled.addAll(shifted);
+        if (selectedUFTIndex == index) selectedUFTIndex = -1;
+        else if (selectedUFTIndex > index) selectedUFTIndex--;
+
+        if (currentFrameIndex > index) currentFrameIndex--;
+        if (currentFrameIndex >= animationFrames.size())
+            currentFrameIndex = animationFrames.size() - 1;
+        grid = animationFrames.get(currentFrameIndex);
+        bgImage = frameBackgrounds.get(currentFrameIndex);
+        undoStack.clear();
+        redoStack.clear();
+
+        ensureUFTCapacity();
+        if (selectedUFTIndex >= 0 && selectedUFTIndex < uftSettings.size())
+            applySettingsSilently(uftSettings.get(selectedUFTIndex));
+        fireChange();
+    }
+
     public void setAdditionalFrames(List<Color[][]> frames) {
         frameBackgrounds.set(currentFrameIndex, bgImage);
         while (animationFrames.size() > 1) animationFrames.remove(animationFrames.size() - 1);
