@@ -29,7 +29,17 @@
     activeColor: '#000000',
     erasing: false,
     ts: null,            // global TransformSettings
+    history: [],         // auto-snapshots, newest first (max HIST_MAX)
   };
+
+  // ── Auto-snapshot history ─────────────────────────────────────────────────
+  const HIST_MAX = 5;
+  const HIST_TICK_MS = 250;
+  const HIST_THRESHOLD_MS = 5000;
+  let histAccumMs = 0;
+  let histPainting = false;
+  let histDirty = false;
+  let histInterval = null;
 
   // ── Color helpers ───────────────────────────────────────────────────────
   function hexToHsl(hex) {
@@ -316,6 +326,7 @@
     const color = S.erasing ? null : (S.activeColor || null);
     if (frame[cell.row][cell.col] === color) return;
     frame[cell.row][cell.col] = color;
+    histDirty = true;
     // Fast single-cell redraw on editor canvas
     const cs = CELL_SIZE[S.gridSize];
     ctx.fillStyle = color || ((cell.row + cell.col) % 2 === 0 ? CHECK_A : CHECK_B);
@@ -325,10 +336,27 @@
     ctx.strokeRect(cell.col * cs + 0.25, cell.row * cs + 0.25, cs - 0.5, cs - 0.5);
   }
 
+  function startHistoryTimer() {
+    histPainting = true;
+    if (histInterval !== null) return;
+    histInterval = setInterval(() => {
+      if (!histPainting) return;
+      histAccumMs += HIST_TICK_MS;
+      if (histAccumMs >= HIST_THRESHOLD_MS) {
+        histAccumMs = 0;
+        if (histDirty) {
+          histDirty = false;
+          captureHistory();
+        }
+      }
+    }, HIST_TICK_MS);
+  }
+
   canvas.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;   // left-click only; erase is a palette button now
     e.preventDefault();
     isPainting = true;
+    startHistoryTimer();
     applyCell(cellAt(e));
   });
 
@@ -337,8 +365,8 @@
     applyCell(cellAt(e));
   });
 
-  canvas.addEventListener('mouseup', () => { isPainting = false; });
-  canvas.addEventListener('mouseleave', () => { isPainting = false; });
+  canvas.addEventListener('mouseup', () => { isPainting = false; histPainting = false; });
+  canvas.addEventListener('mouseleave', () => { isPainting = false; histPainting = false; });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // ── Transform panel ───────────────────────────────────────────────────────
@@ -688,12 +716,77 @@
     return /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : null;
   }
 
+  // ── Auto-snapshot history ─────────────────────────────────────────────────
+  function captureHistory() {
+    const framesCopy = S.frames.map(f => f.map(row => row.slice()));
+    S.history.unshift({
+      frames: framesCopy,
+      frameIndex: Math.min(S.current, framesCopy.length - 1),
+      gridSize: S.gridSize,
+    });
+    if (S.history.length > HIST_MAX) S.history.length = HIST_MAX;
+    renderHistory();
+  }
+
+  function restoreSnapshot(snap) {
+    if (!snap) return;
+    S.gridSize = snap.gridSize;
+    S.frames = snap.frames.map(f => f.map(row => row.slice()));
+    S.current = Math.min(snap.frameIndex, S.frames.length - 1);
+    updateSizeChecks();
+    if (engine) engine.stop();
+    renderAll();
+  }
+
+  function renderHistoryThumb(cv, snap) {
+    const cells = snap.gridSize;
+    const cs = Math.max(1, Math.floor(72 / cells));
+    const px = cells * cs;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = px * dpr;
+    cv.height = px * dpr;
+    cv.style.width = px + 'px';
+    cv.style.height = px + 'px';
+    const c = cv.getContext('2d');
+    c.resetTransform();
+    c.scale(dpr, dpr);
+    const frame = snap.frames[snap.frameIndex] || snap.frames[0];
+    for (let r = 0; r < cells; r++) {
+      for (let col = 0; col < cells; col++) {
+        c.fillStyle = frame[r][col] || ((r + col) % 2 === 0 ? CHECK_A : CHECK_B);
+        c.fillRect(col * cs, r * cs, cs, cs);
+      }
+    }
+  }
+
+  function renderHistory() {
+    const host = document.getElementById('historyGrid');
+    if (!host) return;
+    host.innerHTML = '';
+    S.history.forEach(snap => {
+      const slot = document.createElement('button');
+      slot.className = 'history-thumb';
+      slot.title = 'Restore this state';
+      const cv = document.createElement('canvas');
+      renderHistoryThumb(cv, snap);
+      slot.appendChild(cv);
+      slot.addEventListener('click', () => {
+        if (histDirty) captureHistory();
+        histAccumMs = 0;
+        histDirty = false;
+        restoreSnapshot(snap);
+      });
+      host.appendChild(slot);
+    });
+  }
+
   // ── Full render ───────────────────────────────────────────────────────────
   function renderAll() {
     renderCanvas();
     renderPreview(0);
     renderFrameTabs();
     renderPalette();
+    renderHistory();
     buildTransformPanel();
   }
 
@@ -748,12 +841,12 @@
   }
 
   // ── Resizable preview panel (grab either edge bar) ────────────────────────
-  // Normal layout: drag resizes total preview width, clamped 66%–150% of 210px.
+  // Normal layout: drag resizes total preview width, clamped 200–320px (start 260).
   // Collapsed layout: drag nudges the 50/50 split ±50px via --collapsed-bias.
   function initPreviewResize() {
     const root = document.documentElement;
     const app = document.querySelector('.app');
-    const BASE = 210, MIN = Math.round(BASE * 0.66), MAX = Math.round(BASE * 1.5); // 139 / 315
+    const BASE = 260, MIN = 200, MAX = 320;
     function drag(handleId, sign) {
       const handle = document.getElementById(handleId);
       handle.addEventListener('mousedown', (e) => {
@@ -847,6 +940,9 @@
       if (!confirm('New sprite? All frames will be reset.')) return;
       S.frames = [newGrid(S.gridSize)];
       S.current = 0;
+      S.history = [];
+      histAccumMs = 0;
+      histDirty = false;
       if (engine) engine.stop();
       renderAll();
     });

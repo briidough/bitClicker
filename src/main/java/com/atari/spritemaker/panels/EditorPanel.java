@@ -21,10 +21,33 @@ public class EditorPanel extends JPanel implements ChangeListener {
     private final FrameTabBar frameTabBar;
     private Color lastKnownActiveColor;
 
+    private static final int HIST_TICK_MS = 250;
+    private static final int HIST_THRESHOLD_MS = 5000;
+    private final javax.swing.Timer historyTimer;
+    private long historyAccumMs = 0;
+    private boolean drawing = false;
+    private boolean dirty = false;
+
+    public void resetHistoryTimer() { historyAccumMs = 0; dirty = false; }
+    public boolean isDirty() { return dirty; }
+
     public EditorPanel(SpriteModel model) {
         this.model = model;
         this.lastKnownActiveColor = model.getActiveColor();
         setLayout(new BorderLayout(0, 4));
+
+        historyTimer = new javax.swing.Timer(HIST_TICK_MS, e -> {
+            if (!drawing) return;
+            historyAccumMs += HIST_TICK_MS;
+            if (historyAccumMs >= HIST_THRESHOLD_MS) {
+                historyAccumMs = 0;
+                if (dirty) {
+                    dirty = false;
+                    model.captureHistory();
+                }
+            }
+        });
+        historyTimer.start();
 
         gridCanvas = new GridCanvas();
         add(new JScrollPane(gridCanvas), BorderLayout.CENTER);
@@ -73,13 +96,15 @@ public class EditorPanel extends JPanel implements ChangeListener {
             MouseAdapter ma = new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e)  { handlePress(e); }
                 @Override public void mouseDragged(MouseEvent e)  { handleDrag(e); }
-                @Override public void mouseReleased(MouseEvent e) { clearDrag(); }
+                @Override public void mouseReleased(MouseEvent e) { drawing = false; clearDrag(); }
 
                 private void handlePress(MouseEvent e) {
                     if (model.getMode() == Mode.TRANSFORM) return;
                     int col = e.getX() / CELL, row = e.getY() / CELL;
                     int size = model.getGridSize();
                     if (row < 0 || row >= size || col < 0 || col >= size) return;
+                    drawing = true;
+                    dirty = true;
                     model.pushUndoSnapshot();
                     if (model.getDrawingTool() == DrawingTool.DRAG) {
                         if (model.getCellColor(row, col) != null) {
@@ -105,6 +130,8 @@ public class EditorPanel extends JPanel implements ChangeListener {
 
                 private void handleDrag(MouseEvent e) {
                     if (model.getMode() == Mode.TRANSFORM) return;
+                    drawing = true;
+                    dirty = true;
                     if (model.getDrawingTool() == DrawingTool.DRAG) {
                         if (dragSnapshot == null) return;
                         int col = e.getX() / CELL, row = e.getY() / CELL;

@@ -38,6 +38,8 @@ public class ActionPanel extends JPanel implements ChangeListener {
     // Draw mode extras
     private JButton btnFillFromImage;
     private JButton btnPasteImage;
+    private JButton btnClearPasted;
+    private JButton btnHistory;
     private JToggleButton btnShowBgImage;
     private JPanel drawModeControls;
 
@@ -50,6 +52,9 @@ public class ActionPanel extends JPanel implements ChangeListener {
 
     // ActionEdits panel reference (injected after construction)
     private ActionEditsPanel actionEditsPanel;
+
+    // History panel reference (injected after construction)
+    private HistoryPanel historyPanel;
 
     private java.io.File lastDir = null;
 
@@ -95,6 +100,11 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnFillFromImage.setEnabled(false);
         drawModeControls.add(Box.createVerticalStrut(4));
         drawModeControls.add(btnFillFromImage);
+
+        btnClearPasted = makeBtn("Clear Pasted Image", e -> model.setBgImage(null));
+        btnClearPasted.setEnabled(false);
+        drawModeControls.add(Box.createVerticalStrut(4));
+        drawModeControls.add(btnClearPasted);
 
         drawModeControls.add(Box.createVerticalStrut(4));
         drawModeControls.add(makeBtn("Load Animation Frames", e -> loadAnimationFrames()));
@@ -162,6 +172,15 @@ public class ActionPanel extends JPanel implements ChangeListener {
         btnShowBgImage.setMaximumSize(new Dimension(Integer.MAX_VALUE, btnShowBgImage.getPreferredSize().height));
         btnShowBgImage.addActionListener(e -> model.setShowBgImage(btnShowBgImage.isSelected()));
         drawModeControls.add(btnShowBgImage);
+
+        drawModeControls.add(Box.createVerticalStrut(12));
+        btnHistory = makeBtn("History", e -> {
+            if (historyPanel != null) {
+                historyPanel.setVisible(!historyPanel.isVisible());
+                revalidateParent();
+            }
+        });
+        drawModeControls.add(btnHistory);
 
         // Grid size dropdown (draw mode only)
         drawModeControls.add(Box.createVerticalStrut(12));
@@ -240,6 +259,10 @@ public class ActionPanel extends JPanel implements ChangeListener {
         this.actionEditsPanel = p;
     }
 
+    public void setHistoryPanel(HistoryPanel p) {
+        this.historyPanel = p;
+    }
+
     private MouseAdapter makeEffectReclick(int effectType, String key) {
         return new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) {
@@ -282,6 +305,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
 
         boolean hasImage = model.getBgImage() != null;
         btnFillFromImage.setEnabled(hasImage);
+        btnClearPasted.setEnabled(hasImage);
         btnShowBgImage.setEnabled(hasImage);
         btnShowBgImage.setSelected(model.isShowBgImage());
 

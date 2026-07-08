@@ -18,6 +18,11 @@ For web, when custom,
 Build multi-frame animations with pixel transforms like Pop, Morph, Burst, and Spring
 Runs anywhere with Java 11+ — no extra dependencies, just Swing.
 
+History: while you draw, bitClicker auto-saves snapshots of your whole animation
+every 5 seconds of active drawing. On desktop, click "History" to open the panel
+(keeps 10). On web, a strip below the palette keeps the last 5. Click any snapshot
+to jump back to that state (your current work is saved to history first).
+
 
 Requires Java 11 or newer. Verify with java -version.
 

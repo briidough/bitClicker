@@ -39,11 +39,14 @@ public class SpriteEditorFrame extends JFrame implements ChangeListener {
         actionPanel.setActionEditsPanel(actionEditsPanel);
         editorPanel  = new EditorPanel(model);
         previewPanel = new PreviewPanel(model);
+        HistoryPanel historyPanel = new HistoryPanel(model, editorPanel);
+        actionPanel.setHistoryPanel(historyPanel);
 
         model.addChangeListener(actionPanel);
         model.addChangeListener(editorPanel);
         model.addChangeListener(previewPanel);
         model.addChangeListener(actionEditsPanel);
+        model.addChangeListener(historyPanel);
         model.addChangeListener(this);
         model.addTransformListener(previewPanel::onTransformSettingChanged);
 
@@ -138,6 +141,7 @@ public class SpriteEditorFrame extends JFrame implements ChangeListener {
         actionScroll.setBorder(null);
 
         actionEditsPanel.setVisible(false);
+        historyPanel.setVisible(false);
 
         // Right side: BorderLayout gives editorPreviewSplit the full height of its
         // container (BoxLayout.X_AXIS constrains heights to preferred sizes, which
@@ -145,6 +149,7 @@ public class SpriteEditorFrame extends JFrame implements ChangeListener {
         JPanel rightPanel = new JPanel(new BorderLayout());
         rightPanel.add(actionEditsPanel, BorderLayout.WEST);
         rightPanel.add(editorPreviewSplit, BorderLayout.CENTER);
+        rightPanel.add(historyPanel, BorderLayout.EAST);
 
         // Horizontal split gives ActionPanel a drag handle vs the editor area
         mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, actionScroll, rightPanel);

@@ -1,0 +1,30 @@
+add_history
+Desktop:
+draw action panel.
+add a button for history above grid size and below show pasted image.
+when clicked, expand a new panel for history.
+list the last 10 history in that panel vertically, newest on top, slide older histories down.
+remove the last history if there are already 10
+
+Web: 
+In editor col in grid below palette-area, create a new history grid.
+list the last 5 history in the grid horizontally, newest on the left.
+keep the 5 positions static, when a new history is added, slide the other histories to the right.
+remove the last history if there are already 5
+
+logic
+when a user is drawing in the editor, begin a timer. when they stop, pause it.
+When the timer hits 5 seconds, record the state of the sprite animation. all frames if exist.
+restart the timer. 
+this is one history
+
+if a history is clicked, add the current state to the top of the history list regardless of the timer. reset the timer.
+
+then replace the animation with the animation saved in the history.
+
+if the user clicks in the editor panel, start the timer again.
+
+bugfix:
+desktop: add a button to the action panel for draw to 'clear pasted image'
+keep it greyed out unless there is an image to be cleared.
+put the button below 'fill from image' and above 'load animation frames'

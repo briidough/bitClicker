@@ -74,6 +74,23 @@ public class SpriteModel {
     private final ArrayDeque<Color[][]> undoStack = new ArrayDeque<>();
     private final ArrayDeque<Color[][]> redoStack = new ArrayDeque<>();
 
+    // Auto-snapshot history (newest first), separate from undo/redo.
+    public static final int MAX_SNAPSHOTS = 10;
+    private final List<HistorySnapshot> history = new ArrayList<>();
+
+    public static final class HistorySnapshot {
+        public final List<Color[][]> frames;
+        public final int frameIndex;
+        public final int gridSize;
+        public final BufferedImage thumbnail;
+        HistorySnapshot(List<Color[][]> frames, int frameIndex, int gridSize, BufferedImage thumbnail) {
+            this.frames = frames;
+            this.frameIndex = frameIndex;
+            this.gridSize = gridSize;
+            this.thumbnail = thumbnail;
+        }
+    }
+
     // Unique Frame Transforms
     private final List<TransformSettings> uftSettings = new ArrayList<>();
     private final Set<Integer> uftEnabled = new HashSet<>();
@@ -152,6 +169,7 @@ public class SpriteModel {
         fullAnimationMode = false;
         undoStack.clear();
         redoStack.clear();
+        history.clear();
         applySettingsSilently(new TransformSettings());
         ensureUFTCapacity();
         fireChange();
@@ -190,6 +208,64 @@ public class SpriteModel {
         if (redoStack.isEmpty()) return;
         undoStack.push(getGridCopy());
         setGrid(redoStack.pop());
+    }
+
+    private Color[][] deepCopyFrame(Color[][] frame) {
+        Color[][] copy = new Color[frame.length][];
+        for (int r = 0; r < frame.length; r++)
+            copy[r] = java.util.Arrays.copyOf(frame[r], frame[r].length);
+        return copy;
+    }
+
+    private BufferedImage renderThumbnail(Color[][] frame) {
+        int cell = Math.max(1, 96 / gridSize);
+        int px = gridSize * cell;
+        BufferedImage img = new BufferedImage(px, px, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = img.createGraphics();
+        for (int r = 0; r < gridSize; r++) {
+            for (int c = 0; c < gridSize; c++) {
+                Color col = frame[r][c];
+                if (col == null) continue;
+                g.setColor(col);
+                g.fillRect(c * cell, r * cell, cell, cell);
+            }
+        }
+        g.dispose();
+        return img;
+    }
+
+    public void captureHistory() {
+        List<Color[][]> framesCopy = new ArrayList<>();
+        for (Color[][] f : animationFrames) framesCopy.add(deepCopyFrame(f));
+        int idx = Math.min(currentFrameIndex, framesCopy.size() - 1);
+        BufferedImage thumb = renderThumbnail(framesCopy.get(idx));
+        history.add(0, new HistorySnapshot(framesCopy, idx, gridSize, thumb));
+        while (history.size() > MAX_SNAPSHOTS) history.remove(history.size() - 1);
+        fireChange();
+    }
+
+    public List<HistorySnapshot> getHistory() { return history; }
+
+    public void restoreHistory(int i) {
+        if (i < 0 || i >= history.size()) return;
+        restoreSnapshot(history.get(i));
+    }
+
+    public void restoreSnapshot(HistorySnapshot snap) {
+        if (snap == null) return;
+        gridSize = snap.gridSize;
+        List<Color[][]> restored = new ArrayList<>();
+        for (Color[][] f : snap.frames) restored.add(deepCopyFrame(f));
+        animationFrames = restored;
+        frameBackgrounds = new ArrayList<>();
+        for (int k = 0; k < animationFrames.size(); k++) frameBackgrounds.add(null);
+        currentFrameIndex = Math.min(snap.frameIndex, animationFrames.size() - 1);
+        grid = animationFrames.get(currentFrameIndex);
+        bgImage = null;
+        undoStack.clear();
+        redoStack.clear();
+        ensureUFTCapacity();
+        fireChange();
     }
 
     public List<Color[][]> getAnimationFrames() { return animationFrames; }

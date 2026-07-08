@@ -14,7 +14,7 @@
   --danger:      #e94560;
   --frame-w:     10px;
   --frame-color: #5a3a90;
-  --preview-w: 210px;
+  --preview-w: 260px;
   --collapsed-bias: 0px;
   --grid-glow:    rgba(90,58,144,0.4);
   --preview-glow: rgba(0,229,255,0.12);
@@ -396,6 +396,50 @@ input[type="color"] {
   padding: 1px;
   background: var(--bg-mid);
   cursor: pointer;
+}
+
+/* ── History area ────────────────────────────────────────────────── */
+.history-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+}
+
+.history-title {
+  font-size: 11px;
+  color: var(--fg-accent);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.history-grid {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 40px;
+  width: 100%;
+}
+
+.history-thumb {
+  padding: 2px;
+  background: var(--bg-mid);
+  border: 1px solid var(--border-hi);
+  cursor: pointer;
+  line-height: 0;
+  transition: border-color 0.1s, box-shadow 0.1s, transform 0.15s ease;
+}
+
+.history-thumb:hover {
+  border-color: var(--fg-accent);
+  box-shadow: 0 0 6px var(--fg-accent);
+}
+
+.history-thumb canvas {
+  display: block;
+  image-rendering: pixelated;
 }
 
 /* ── Transform column ────────────────────────────────────────────── */
