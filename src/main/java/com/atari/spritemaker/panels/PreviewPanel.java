@@ -40,6 +40,12 @@ public class PreviewPanel extends JPanel implements ChangeListener {
     private int lastSelectedUFT = -1;
     private boolean lastUFTEnabled = false;
 
+    // Frame-loop playback (full-animation Play only): intro once, then ping-pong the pair.
+    private static final int LOOP_INTRO = 0, LOOP_FWD = 1, LOOP_REV = 2;
+    private boolean loopActive = false;
+    private int loopA = 0, loopB = 0;
+    private int loopStage = LOOP_INTRO;
+
     // Preview canvas background (user-controlled via BgColorSlider)
     private Color canvasBg = RetroTheme.active
         ? RetroTheme.BG_DARK
@@ -116,6 +122,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             precomputedTransitions = null;
             currentTransitionIdx = uftLoopMode ? selUFT : 0;
             currentFrameIdx = currentTransitionIdx;
+            if (uftLoopMode) loopActive = false; else initLoopPlayback();
             startBurst();
         });
         btnPause.addActionListener(e -> {
@@ -123,6 +130,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         });
         btnStep.addActionListener(e -> {
             uftLoopMode = false;
+            loopActive = false;
             playing = false;
             precomputedTransitions = null;
             if (!animating) startBurst();
@@ -131,6 +139,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             playing = false;
             animating = false;
             uftLoopMode = false;
+            loopActive = false;
             currentFrameIdx = 0;
             currentTransitionIdx = 0;
             precomputedTransitions = null;
@@ -149,6 +158,11 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 animating = false;
                 burstTimer.stop();
                 pauseTimer.stop();
+                if (loopActive && playing) {
+                    currentTransitionIdx = 0;
+                    currentFrameIdx = 0;
+                    initLoopPlayback();
+                }
                 startBurst();
             }
         });
@@ -167,6 +181,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             playing = false;
             animating = false;
             uftLoopMode = false;
+            loopActive = false;
             lastSelectedUFT = -1;
             lastUFTEnabled = false;
             burstTimer.stop();
@@ -192,6 +207,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 pauseTimer.stop();
                 animating = false;
                 if (selectedUFT >= 0) {
+                    loopActive = false;
                     currentTransitionIdx = selectedUFT;
                     currentFrameIdx = selectedUFT;
                     if (uftIsEnabled && frames.size() >= 2) {
@@ -216,6 +232,7 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                 animating = false;
                 currentTransitionIdx = 0;
                 currentFrameIdx = 0;
+                initLoopPlayback();
                 startBurst();
                 return;
             }
@@ -382,6 +399,50 @@ public class PreviewPanel extends JPanel implements ChangeListener {
         }
     }
 
+    // Arm frame-loop playback based on the model's loop fields. Called at Play.
+    private void initLoopPlayback() {
+        loopActive = false;
+        int N = model.getAnimationFrames().size();
+        if (model.isLoopEnabled() && N >= 3) {
+            int a = model.getLoopStart(), b = model.getLoopEnd();
+            if (a >= 0 && b == a + 1 && b <= N - 1) {
+                loopActive = true;
+                loopA = a;
+                loopB = b;
+                loopStage = (a == 0) ? LOOP_FWD : LOOP_INTRO;
+            }
+        }
+    }
+
+    // Called when the active transition finishes while looping: pick the next leg.
+    private void advanceLoop() {
+        if (loopStage == LOOP_INTRO) {
+            currentTransitionIdx += 1;
+            currentFrameIdx = currentTransitionIdx;
+            if (currentTransitionIdx >= loopA) loopStage = LOOP_FWD;
+        } else if (loopStage == LOOP_FWD) {
+            currentFrameIdx = loopB;
+            currentTransitionIdx = loopA;
+            loopStage = LOOP_REV;
+        } else { // LOOP_REV
+            currentFrameIdx = loopA;
+            currentTransitionIdx = loopA;
+            loopStage = LOOP_FWD;
+        }
+    }
+
+    // Build the reverse leg Fb -> Fa using the same effect/settings as the forward pair.
+    private TransitionData buildLoopReverse(List<Color[][]> frames) {
+        model.syncSelectedUFT();
+        TransformSettings saved = TransformSettings.capture(model);
+        TransformSettings globalFallback = saved.copy();
+        TransformSettings ts = model.getTransformForTransition(loopA);
+        model.applySettingsSilently(ts != null ? ts : globalFallback);
+        TransitionData td = buildTransitionData(frames, loopB, loopA);
+        model.applySettingsSilently(saved);
+        return td;
+    }
+
     private void startBurst() {
         burstTimer.stop();
         List<Color[][]> frames = model.getAnimationFrames();
@@ -419,7 +480,9 @@ public class PreviewPanel extends JPanel implements ChangeListener {
             model.applySettingsSilently(saved);
         }
 
-        active = precomputedTransitions[currentTransitionIdx];
+        active = (loopActive && loopStage == LOOP_REV)
+            ? buildLoopReverse(frames)
+            : precomputedTransitions[currentTransitionIdx];
         animProgress = 0f;
         midHoldElapsedMs = 0;
         extendElapsedMs = 0;
@@ -502,8 +565,12 @@ public class PreviewPanel extends JPanel implements ChangeListener {
                     pauseTimer.start();
                 }
             } else {
-                currentTransitionIdx = (currentTransitionIdx + 1) % N;
-                currentFrameIdx = currentTransitionIdx;
+                if (loopActive && playing) {
+                    advanceLoop();
+                } else {
+                    currentTransitionIdx = (currentTransitionIdx + 1) % N;
+                    currentFrameIdx = currentTransitionIdx;
+                }
                 if (playing) {
                     int holdMs = active.lockedEffectType == 3 ? active.animMorphHoldMs
                                : active.lockedEffectType == 4 ? active.springHoldMs

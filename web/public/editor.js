@@ -30,6 +30,9 @@
     erasing: false,
     ts: null,            // global TransformSettings
     history: [],         // auto-snapshots, newest first (max HIST_MAX)
+    // Frame loop: marker sits in the gap between frames[gap] and frames[gap+1].
+    // gap ∈ [0 .. frames.length-2]. parked = marker under ⟳ (loop off).
+    loop: { shown: false, enabled: false, gap: null, parked: false },
   };
 
   // ── Auto-snapshot history ─────────────────────────────────────────────────
@@ -249,6 +252,127 @@
       overlay.appendChild(dialog);
       host.appendChild(overlay);
     });
+  }
+
+  // ── Frame loop row ──────────────────────────────────────────────────────
+  function clampLoop() {
+    const n = S.frames.length;
+    if (n < 3) {
+      S.loop.shown = false; S.loop.enabled = false;
+      S.loop.parked = false; S.loop.gap = null;
+      return;
+    }
+    if (S.loop.gap === null) S.loop.gap = n - 2;
+    S.loop.gap = Math.max(0, Math.min(n - 2, S.loop.gap));
+  }
+
+  // Snap targets (x offsets relative to the loop row): one per interior frame
+  // gap, plus a final "park" slot under the loop button.
+  function loopSnaps() {
+    const row = document.getElementById('loopRow');
+    const tabsEl = document.getElementById('frameTabs');
+    const rowLeft = row.getBoundingClientRect().left;
+    const tabs = Array.from(tabsEl.querySelectorAll('.frame-tab'));
+    const snaps = [];
+    for (let g = 0; g < tabs.length - 1; g++) {
+      const r1 = tabs[g].getBoundingClientRect();
+      const r2 = tabs[g + 1].getBoundingClientRect();
+      snaps.push({ x: (r1.right + r2.left) / 2 - rowLeft, gap: g });
+    }
+    const parkRef = tabsEl.querySelector('.add-frame-btn') || tabs[tabs.length - 1];
+    if (parkRef) {
+      const pr = parkRef.getBoundingClientRect();
+      snaps.push({ x: (pr.left + pr.right) / 2 - rowLeft, park: true });
+    }
+    return snaps;
+  }
+
+  function nearestSnap(snaps, clientX) {
+    const rowLeft = document.getElementById('loopRow').getBoundingClientRect().left;
+    const x = clientX - rowLeft;
+    let best = snaps[0], bestD = Infinity;
+    for (const s of snaps) {
+      const d = Math.abs(s.x - x);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    return best;
+  }
+
+  function renderLoopRow() {
+    const row = document.getElementById('loopRow');
+    if (!row) return;
+    clampLoop();
+    row.innerHTML = '';
+    const n = S.frames.length;
+
+    const loopBtn = document.createElement('button');
+    loopBtn.className = 'loop-btn';
+    loopBtn.title = 'Frame loop';
+    loopBtn.textContent = '⟳';
+    loopBtn.disabled = n < 3;
+    loopBtn.addEventListener('click', () => {
+      if (n < 3) return;
+      if (S.loop.shown) {
+        S.loop.shown = false; S.loop.enabled = false; S.loop.parked = false;
+      } else {
+        S.loop.shown = true; S.loop.enabled = true;
+        S.loop.parked = false; S.loop.gap = n - 2;
+      }
+      renderLoopRow();
+    });
+    row.appendChild(loopBtn);
+
+    if (!S.loop.shown || n < 3) return;
+
+    const snaps = loopSnaps();
+    const parkSnap = snaps.find(s => s.park);
+    const gapSnap = snaps.find(s => s.gap === S.loop.gap);
+
+    const marker = document.createElement('button');
+    marker.className = 'loopframe-marker '
+      + (S.loop.parked ? 'parked' : (S.loop.enabled ? 'enabled' : 'disabled'));
+    marker.title = 'Drag to set loop; click to disable; right-click to re-enable';
+    marker.textContent = '↻';
+    const target = S.loop.parked ? parkSnap : (gapSnap || parkSnap);
+    marker.style.left = (target ? target.x : 0) + 'px';
+
+    let dragging = false, moved = false, startX = 0, suppressClick = false;
+    marker.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      dragging = true; moved = false; startX = e.clientX;
+      const onMove = (ev) => {
+        if (!dragging) return;
+        if (Math.abs(ev.clientX - startX) > 3) moved = true;
+        marker.style.left = nearestSnap(snaps, ev.clientX).x + 'px';
+      };
+      const onUp = (ev) => {
+        dragging = false;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        if (!moved) return;
+        suppressClick = true;
+        const near = nearestSnap(snaps, ev.clientX);
+        if (near.park) { S.loop.parked = true; S.loop.enabled = false; }
+        else { S.loop.parked = false; S.loop.enabled = true; S.loop.gap = near.gap; }
+        renderLoopRow();
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+
+    marker.addEventListener('click', () => {
+      if (suppressClick) { suppressClick = false; return; }
+      if (S.loop.parked) return;
+      if (S.loop.enabled) { S.loop.enabled = false; renderLoopRow(); }
+    });
+
+    marker.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (!S.loop.parked && !S.loop.enabled) { S.loop.enabled = true; renderLoopRow(); }
+    });
+
+    row.appendChild(marker);
   }
 
   // ── Palette ───────────────────────────────────────────────────────────────
@@ -586,7 +710,7 @@
     const zip = new JSZip();
     const gs = S.gridSize;
     const canvasPx = gs * 4;
-    let saved = 0;
+    const savedIndices = [];   // original frame indices kept, in save order
 
     for (let fi = 0; fi < S.frames.length; fi++) {
       const frame = S.frames[fi];
@@ -603,10 +727,22 @@
       }
       svg += `</svg>`;
       zip.file(`frame_${fi}.svg`, svg);
-      saved++;
+      savedIndices.push(fi);
     }
 
-    if (saved === 0) { alert('No non-empty frames to save.'); return; }
+    if (savedIndices.length === 0) { alert('No non-empty frames to save.'); return; }
+
+    // Frame-loop manifest. Endpoints are remapped onto the saved (compacted)
+    // frame order; disabled if either loop frame was empty (and thus skipped).
+    let manifest = { version: 1, loopEnabled: false };
+    if (S.loop.shown && S.loop.enabled && !S.loop.parked && S.loop.gap !== null) {
+      const posA = savedIndices.indexOf(S.loop.gap);
+      const posB = savedIndices.indexOf(S.loop.gap + 1);
+      if (posA >= 0 && posB === posA + 1) {
+        manifest = { version: 1, loopEnabled: true, loopStart: posA, loopEnd: posB };
+      }
+    }
+    zip.file('anim.json', JSON.stringify(manifest));
 
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
@@ -625,6 +761,12 @@
 
     for (const [name, entry] of Object.entries(zip.files)) {
       if (name.endsWith('.svg')) svgMap[name] = await entry.async('text');
+    }
+
+    let manifest = null;
+    const manifestEntry = zip.file('anim.json');
+    if (manifestEntry) {
+      try { manifest = JSON.parse(await manifestEntry.async('text')); } catch (e) { manifest = null; }
     }
 
     const names = Object.keys(svgMap).sort();
@@ -655,6 +797,14 @@
     S.gridSize = targetSize;
     S.frames = resized.slice(0, MAX_FRAMES);
     S.current = 0;
+
+    S.loop = { shown: false, enabled: false, gap: null, parked: false };
+    if (manifest && manifest.loopEnabled && S.frames.length >= 3) {
+      const a = manifest.loopStart, b = manifest.loopEnd;
+      if (Number.isInteger(a) && b === a + 1 && a >= 0 && b <= S.frames.length - 1) {
+        S.loop = { shown: true, enabled: true, gap: a, parked: false };
+      }
+    }
 
     updateSizeChecks();
 
@@ -785,6 +935,7 @@
     renderCanvas();
     renderPreview(0);
     renderFrameTabs();
+    renderLoopRow();
     renderPalette();
     renderHistory();
     buildTransformPanel();
@@ -906,6 +1057,8 @@
     S.activeColor = '#000000';
     S.erasing = false;
     S.ts = defaultTS();
+    S.loop = { shown: false, enabled: false, gap: null, parked: false };
+    window.addEventListener('resize', () => { if (S.loop.shown) renderLoopRow(); });
 
     // Grid size options (inside Whatnot menu)
     document.querySelectorAll('.size-opt').forEach(btn => {
@@ -916,6 +1069,7 @@
         S.gridSize = newSize;
         S.frames = [newGrid(newSize)];
         S.current = 0;
+        S.loop = { shown: false, enabled: false, gap: null, parked: false };
         if (engine) engine.stop();
         updateSizeChecks();
         renderAll();
@@ -940,6 +1094,7 @@
       if (!confirm('New sprite? All frames will be reset.')) return;
       S.frames = [newGrid(S.gridSize)];
       S.current = 0;
+      S.loop = { shown: false, enabled: false, gap: null, parked: false };
       S.history = [];
       histAccumMs = 0;
       histDirty = false;

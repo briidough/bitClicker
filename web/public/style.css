@@ -311,6 +311,66 @@ body {
   color: var(--fg-accent);
 }
 
+/* ── Frame loop row (below the tabs) ─────────────────────────────── */
+.loop-row {
+  position: relative;
+  height: 22px;
+  margin-top: 2px;
+}
+
+.loop-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  transform: translateX(50%);
+  background: none;
+  border: 1px dashed var(--border-hi);
+  color: var(--border-hi);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 1px 6px 3px;
+  cursor: pointer;
+}
+
+.loop-btn:hover:not(:disabled) {
+  border-color: var(--fg-accent);
+  color: var(--fg-accent);
+}
+
+.loop-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.loopframe-marker {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  background: var(--bg-mid);
+  border: 1px solid var(--fg-accent);
+  color: var(--fg-accent);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 1px 5px 3px;
+  cursor: ew-resize;
+  user-select: none;
+}
+
+.loopframe-marker.disabled {
+  border-color: var(--border-hi);
+  color: var(--border-hi);
+  opacity: 0.6;
+}
+
+.loopframe-marker.parked {
+  border-style: dashed;
+  border-color: var(--border-hi);
+  color: var(--border-hi);
+  opacity: 0.4;
+}
+
 /* ── Canvas ──────────────────────────────────────────────────────── */
 #grid {
   display: block;

@@ -46,7 +46,7 @@ class AnimEngine {
     this._stopTimers();
     this.playing = false;
     document.getElementById('previewPlay').classList.remove('playing');
-    this._startTransition();
+    this._startTransition(true);   // forward-only: breaks out of the loop
   }
 
   play() {
@@ -100,10 +100,33 @@ class AnimEngine {
     if (this._holdTimer) { clearTimeout(this._holdTimer);  this._holdTimer = null; }
   }
 
-  _startTransition() {
+  // True when a valid frame loop is configured and enabled.
+  _isLooping() {
+    const S  = this._S();
+    const lp = S.loop;
+    const n  = S.frames.length;
+    return !!(lp && lp.shown && lp.enabled && !lp.parked
+              && n >= 3 && lp.gap !== null && lp.gap >= 0 && lp.gap <= n - 2);
+  }
+
+  // Next frame index for auto-play. Honors the loop: walk toward the loop
+  // region during the intro, then ping-pong between frames[gap] and [gap+1].
+  _advanceTarget() {
+    const S = this._S();
+    const n = S.frames.length;
+    if (!this._isLooping()) return (this.current + 1) % n;
+    const a = S.loop.gap, b = a + 1;
+    if (this.current < a) return this.current + 1;   // intro walk-up
+    if (this.current > b) return this.current - 1;   // walk back into region
+    return this.current === a ? b : a;               // bounce a <-> b
+  }
+
+  _startTransition(stepForward) {
     const S = this._S();
     if (S.frames.length < 2) return;
-    const toIdx   = (this.current + 1) % S.frames.length;
+    const toIdx   = stepForward ? (this.current + 1) % S.frames.length
+                                : this._advanceTarget();
+    this._toIdx   = toIdx;
     this.active   = this._buildTD(this.current, toIdx);
     this.progress = 0;
     this._holdElapsed   = 0;
@@ -156,7 +179,7 @@ class AnimEngine {
 
       const S   = this._S();
       const N   = S.frames.length;
-      this.current  = (this.current + 1) % N;
+      this.current  = (this._toIdx != null) ? this._toIdx : (this.current + 1) % N;
       this.frameIdx = this.current;
 
       if (this.playing) {

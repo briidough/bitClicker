@@ -847,6 +847,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         int gridSize = model.getGridSize();
         int canvasPx = gridSize * 4;
         int saved = 0;
+        java.util.List<Integer> savedIndices = new java.util.ArrayList<>();
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(path))) {
             for (int fi = 0; fi < frames.size(); fi++) {
                 Color[][] frame = frames.get(fi);
@@ -856,6 +857,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
                     for (int c = 0; c < frame[r].length; c++)
                         if (frame[r][c] != null) { hasContent = true; break outer; }
                 if (!hasContent) continue;
+                savedIndices.add(fi);
                 StringBuilder sb = new StringBuilder();
                 sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
                 sb.append(String.format("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\">%n",
@@ -916,6 +918,20 @@ public class ActionPanel extends JPanel implements ChangeListener {
             zos.putNextEntry(new ZipEntry("uft_config.properties"));
             zos.write(propsBytes);
             zos.closeEntry();
+
+            // Frame-loop manifest, remapped onto the saved (compacted) frame order.
+            String manifest = "{\"version\":1,\"loopEnabled\":false}";
+            if (model.isLoopEnabled()) {
+                int posA = savedIndices.indexOf(model.getLoopStart());
+                int posB = savedIndices.indexOf(model.getLoopEnd());
+                if (posA >= 0 && posB == posA + 1) {
+                    manifest = "{\"version\":1,\"loopEnabled\":true,\"loopStart\":"
+                             + posA + ",\"loopEnd\":" + posB + "}";
+                }
+            }
+            zos.putNextEntry(new ZipEntry("anim.json"));
+            zos.write(manifest.getBytes("UTF-8"));
+            zos.closeEntry();
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, "Save Spriteamation failed: " + ex.getMessage());
             return;
@@ -944,6 +960,7 @@ public class ActionPanel extends JPanel implements ChangeListener {
         if (file == null) return;
         java.util.TreeMap<String, byte[]> entries = new java.util.TreeMap<>();
         byte[] uftConfigData = null;
+        byte[] animJsonData = null;
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(file))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
@@ -955,6 +972,8 @@ public class ActionPanel extends JPanel implements ChangeListener {
                     entries.put(entry.getName(), baos.toByteArray());
                 } else if ("uft_config.properties".equals(entry.getName())) {
                     uftConfigData = baos.toByteArray();
+                } else if ("anim.json".equals(entry.getName())) {
+                    animJsonData = baos.toByteArray();
                 }
                 zis.closeEntry();
             }
@@ -1032,6 +1051,27 @@ public class ActionPanel extends JPanel implements ChangeListener {
                 // Non-fatal: just ignore corrupt UFT config
             }
         }
+
+        model.clearLoop();
+        if (animJsonData != null) {
+            try {
+                String j = new String(animJsonData, "UTF-8");
+                if (j.matches("(?s).*\"loopEnabled\"\\s*:\\s*true.*")) {
+                    int a = jsonInt(j, "loopStart", -1);
+                    int b = jsonInt(j, "loopEnd", -1);
+                    if (a >= 0 && b == a + 1 && b <= model.getFrameCount() - 1)
+                        model.setLoop(true, a, b);
+                }
+            } catch (Exception ex) {
+                // Non-fatal: ignore malformed loop manifest
+            }
+        }
+    }
+
+    private int jsonInt(String json, String key, int def) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("\"" + key + "\"\\s*:\\s*(-?\\d+)").matcher(json);
+        return m.find() ? Integer.parseInt(m.group(1)) : def;
     }
 
     private int intProp(Properties p, String key, int def) {

@@ -23,6 +23,20 @@ every 5 seconds of active drawing. On desktop, click "History" to open the panel
 (keeps 10). On web, a strip below the palette keeps the last 5. Click any snapshot
 to jump back to that state (your current work is saved to history first).
 
+Frame loop: with 3 or more frames you can loop a two-frame pair. The animation plays
+the intro once, then ping-pongs that pair forever.
+  Desktop: in the row just below the frame tabs, click the loop button (round arrow)
+  to turn it on, then use the left/right arrows to choose which adjacent pair loops.
+  Click the loop button again to turn it off. Play the preview to see it bounce; Step
+  walks straight through the frames and breaks out of the loop.
+  Web: in the draw panel, click the loop button at the right of the row under the
+  frame tabs. A marker drops between two frames — drag it to pick the pair. Drag it
+  under the loop button (or left-click it) to disable; right-click a disabled marker
+  to re-enable.
+The loop is saved inside your .sga file and travels with it. When a looped .bxl
+export plays via bixelPlay, clicking the canvas breaks out of the loop and finishes
+the animation.
+
 
 Requires Java 11 or newer. Verify with java -version.
 

@@ -19,6 +19,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
     private final JToggleButton eraserBtn;
     private final JLabel modeLabel;
     private final FrameTabBar frameTabBar;
+    private final LoopBar loopBar;
     private Color lastKnownActiveColor;
 
     private static final int HIST_TICK_MS = 250;
@@ -61,9 +62,11 @@ public class EditorPanel extends JPanel implements ChangeListener {
         titleRow.add(eraserBtn);
 
         frameTabBar = new FrameTabBar();
+        loopBar = new LoopBar();
         JPanel northContainer = new JPanel();
         northContainer.setLayout(new BoxLayout(northContainer, BoxLayout.Y_AXIS));
         northContainer.add(frameTabBar);
+        northContainer.add(loopBar);
         northContainer.add(titleRow);
         add(northContainer, BorderLayout.NORTH);
     }
@@ -83,6 +86,7 @@ public class EditorPanel extends JPanel implements ChangeListener {
         gridCanvas.updateSize();
         gridCanvas.repaint();
         frameTabBar.refresh();
+        loopBar.refresh();
     }
 
     private class GridCanvas extends JPanel {
@@ -321,6 +325,80 @@ public class EditorPanel extends JPanel implements ChangeListener {
             int tx = (w - fm.stringWidth(txt)) / 2;
             int ty = half / 2 + fm.getAscent() / 2;
             g.drawString(txt, tx, ty);
+        }
+    }
+
+    // Frame-loop authoring: toggle a two-frame ping-pong loop, move the pair with arrows.
+    private class LoopBar extends JPanel {
+        private final JToggleButton toggle;
+        private final JButton prev;
+        private final JButton next;
+        private final JLabel label;
+
+        LoopBar() {
+            setLayout(new FlowLayout(FlowLayout.LEFT, 4, 0));
+
+            toggle = new JToggleButton("↻");
+            toggle.setMargin(new Insets(1, 4, 1, 4));
+            toggle.setToolTipText("Loop a two-frame pair (needs 3+ frames)");
+            toggle.addActionListener(e -> {
+                int n = model.getFrameCount();
+                if (n < 3) { loopBar.refresh(); return; }
+                if (toggle.isSelected()) {
+                    int a = model.isLoopEnabled() ? model.getLoopStart() : n - 2;
+                    if (a < 0 || a > n - 2) a = n - 2;
+                    model.setLoop(true, a, a + 1);
+                } else {
+                    model.clearLoop();
+                }
+            });
+
+            prev = new JButton("◀");
+            prev.setMargin(new Insets(1, 4, 1, 4));
+            prev.setToolTipText("Move loop pair left");
+            prev.addActionListener(e -> shift(-1));
+
+            next = new JButton("▶");
+            next.setMargin(new Insets(1, 4, 1, 4));
+            next.setToolTipText("Move loop pair right");
+            next.addActionListener(e -> shift(1));
+
+            label = new JLabel();
+            label.setFont(label.getFont().deriveFont(11f));
+
+            add(toggle);
+            add(prev);
+            add(next);
+            add(label);
+            refresh();
+        }
+
+        private void shift(int d) {
+            if (!model.isLoopEnabled()) return;
+            int n = model.getFrameCount();
+            int a = model.getLoopStart() + d;
+            a = Math.max(0, Math.min(a, n - 2));
+            if (a != model.getLoopStart()) model.setLoop(true, a, a + 1);
+        }
+
+        void refresh() {
+            int n = model.getFrameCount();
+            boolean can = n >= 3;
+            boolean on = model.isLoopEnabled();
+            toggle.setEnabled(can);
+            toggle.setSelected(on);
+            int a = model.getLoopStart();
+            prev.setEnabled(on && can && a > 0);
+            next.setEnabled(on && can && a < n - 2);
+            if (on && can) {
+                label.setText("Loop F" + (a + 1) + "–F" + (a + 2));
+            } else if (can) {
+                label.setText("Loop off");
+            } else {
+                label.setText("Loop needs 3+ frames");
+            }
+            revalidate();
+            repaint();
         }
     }
 

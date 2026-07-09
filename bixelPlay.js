@@ -105,6 +105,67 @@ class BixelPlay {
     this._active   = null;
     this._sequence = [];
     this._onDone   = null;
+    this._escaped  = false;
+  }
+
+  /**
+   * Play the two-frame loop encoded in the .bxl (data.loopStart / data.loopEnd):
+   * the intro (frame 0 → loopStart) plays once, then the pair ping-pongs forever.
+   * Clicking the canvas escapes the loop — it finishes the current leg, continues
+   * forward to the last frame, then resumes the normal full-sequence loop.
+   * Falls back to a plain full-sequence loop when no loop tag is present.
+   */
+  loop() {
+    const N = this.data.frameCount;
+    const a = this.data.loopStart, b = this.data.loopEnd;
+    this._hasLoop = Number.isInteger(a) && b === a + 1 && a >= 0 && b <= N - 1;
+    this._escaped = false;
+    this._bindLoopClick();
+    if (this._hasLoop) this._introThenBounce();
+    else this._cycleAll();
+  }
+
+  _bindLoopClick() {
+    if (this._clickBound) return;
+    this._clickBound = true;
+    this.canvas.addEventListener('click', () => {
+      if (this._hasLoop && !this._escaped) this._escaped = true;
+    });
+  }
+
+  _introThenBounce() {
+    const a = this.data.loopStart;
+    this.setFrame(0);
+    this.play(0, a, () => this._bounce(true));   // a===0 → onDone fires at once
+  }
+
+  _bounce(forward) {
+    if (this._escaped) { this._continueToEnd(); return; }
+    const a = this.data.loopStart, b = this.data.loopEnd;
+    if (forward) this.play(a, b, () => this._bounce(false));
+    else         this.play(b, a, () => this._bounce(true));
+  }
+
+  _continueToEnd() {
+    const N = this.data.frameCount;
+    if (this.currentFrame >= N - 1) { this._cycleAll(); return; }
+    this.play(this.currentFrame, N - 1, () => this._cycleAll());
+  }
+
+  // Plain forward full-sequence loop (0 → 1 → … → N-1 → 0 → …).
+  _cycleAll() {
+    const N = this.data.frameCount;
+    if (N < 2) { this.setFrame(0); return; }
+    const step = () => {
+      const from = this.currentFrame;
+      if (from >= N - 1) {
+        this.setFrame(0);
+        this._holdTimer = setTimeout(step, 1);
+      } else {
+        this.play(from, from + 1, step);
+      }
+    };
+    step();
   }
 
   // ── Sequence ───────────────────────────────────────────────────────────────

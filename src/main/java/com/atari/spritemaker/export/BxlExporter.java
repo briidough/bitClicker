@@ -18,6 +18,14 @@ public class BxlExporter {
         sb.append("  \"gridSize\": ").append(gridSize).append(",\n");
         sb.append("  \"frameCount\": ").append(N).append(",\n");
         sb.append("  \"loop\": true,\n");
+        // Optional two-frame loop tag. Old players ignore these fields.
+        if (model.isLoopEnabled()
+                && model.getLoopStart() >= 0
+                && model.getLoopEnd() == model.getLoopStart() + 1
+                && model.getLoopEnd() <= N - 1) {
+            sb.append("  \"loopStart\": ").append(model.getLoopStart()).append(",\n");
+            sb.append("  \"loopEnd\": ").append(model.getLoopEnd()).append(",\n");
+        }
 
         sb.append("  \"palette\": [");
         Color[] pal = model.getPalette();

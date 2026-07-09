@@ -67,6 +67,10 @@ public class SpriteModel {
     private int animSpringImpulse   = 40;
     private int animSpringSpeedMs   = 1400;
     private int animSpringHoldMs    = 300;
+    // Two-frame loop (authored in the web app, carried through .sga → .bxl).
+    private boolean loopEnabled = false;
+    private int     loopStart   = -1;   // frame index a
+    private int     loopEnd     = -1;   // frame index b == a + 1
     private final List<ChangeListener> listeners = new ArrayList<>();
     private final List<Runnable> transformListeners = new ArrayList<>();
 
@@ -265,6 +269,7 @@ public class SpriteModel {
         undoStack.clear();
         redoStack.clear();
         ensureUFTCapacity();
+        clampLoopToFrames();
         fireChange();
     }
 
@@ -273,6 +278,28 @@ public class SpriteModel {
 
     public int getCurrentFrameIndex() { return currentFrameIndex; }
     public int getFrameCount() { return animationFrames.size(); }
+
+    public boolean isLoopEnabled() { return loopEnabled; }
+    public int getLoopStart()      { return loopStart; }
+    public int getLoopEnd()        { return loopEnd; }
+    public void setLoop(boolean enabled, int start, int end) {
+        loopEnabled = enabled; loopStart = start; loopEnd = end;
+        fireChange();
+    }
+    public void clearLoop() {
+        if (!loopEnabled && loopStart < 0 && loopEnd < 0) return;
+        loopEnabled = false; loopStart = -1; loopEnd = -1;
+        fireChange();
+    }
+    // Keep the loop pair within the current frame range; disable below 3 frames.
+    private void clampLoopToFrames() {
+        if (!loopEnabled) return;
+        int n = animationFrames.size();
+        if (n < 3) { loopEnabled = false; loopStart = -1; loopEnd = -1; return; }
+        if (loopStart < 0) loopStart = 0;
+        if (loopStart > n - 2) loopStart = n - 2;
+        loopEnd = loopStart + 1;
+    }
 
     public void switchToFrame(int index) {
         if (index < 0 || index >= animationFrames.size() || index == currentFrameIndex) return;
@@ -296,6 +323,7 @@ public class SpriteModel {
         grid = animationFrames.get(currentFrameIndex);
         bgImage = null;
         ensureUFTCapacity();
+        clampLoopToFrames();
         fireChange();
     }
 
@@ -330,6 +358,7 @@ public class SpriteModel {
         ensureUFTCapacity();
         if (selectedUFTIndex >= 0 && selectedUFTIndex < uftSettings.size())
             applySettingsSilently(uftSettings.get(selectedUFTIndex));
+        clampLoopToFrames();
         fireChange();
     }
 
@@ -348,6 +377,7 @@ public class SpriteModel {
             bgImage = frameBackgrounds.get(0);
         }
         ensureUFTCapacity();
+        clampLoopToFrames();
         fireChange();
     }
 
