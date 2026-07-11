@@ -33,6 +33,12 @@
     // Frame loop: marker sits in the gap between frames[gap] and frames[gap+1].
     // gap ∈ [0 .. frames.length-2]. parked = marker under ⟳ (loop off).
     loop: { shown: false, enabled: false, gap: null, parked: false },
+    // Mobile triangle brush: offset cursor so the paint point (tip) sits above
+    // the finger instead of under it. enabled defaults by screen size at init.
+    // mode: 'auto' = draw after a hold (dwell); 'manual' = draw only while
+    // pressing hard (momentary). firmActive tracks the current hard-press in
+    // manual mode.
+    brush: { enabled: false, mode: 'auto', phase: 'aim', down: false, firmActive: false, tipCell: null },
   };
 
   // ── Auto-snapshot history ─────────────────────────────────────────────────
@@ -431,18 +437,20 @@
   // ── Canvas events ─────────────────────────────────────────────────────────
   let isPainting = false;
 
-  function cellAt(e) {
+  function cellAtPoint(clientX, clientY) {
     const cs = CELL_SIZE[S.gridSize];
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / (window.devicePixelRatio || 1) / rect.width;
     const scaleY = canvas.height / (window.devicePixelRatio || 1) / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
     const col = Math.floor(x / cs);
     const row = Math.floor(y / cs);
     if (row < 0 || row >= S.gridSize || col < 0 || col >= S.gridSize) return null;
     return { row, col };
   }
+
+  function cellAt(e) { return cellAtPoint(e.clientX, e.clientY); }
 
   function applyCell(cell) {
     if (!cell) return;
@@ -477,6 +485,7 @@
   }
 
   canvas.addEventListener('mousedown', (e) => {
+    if (S.brush.enabled) return;  // brush mode handles input via pointer events
     if (e.button !== 0) return;   // left-click only; erase is a palette button now
     e.preventDefault();
     isPainting = true;
@@ -485,6 +494,7 @@
   });
 
   canvas.addEventListener('mousemove', (e) => {
+    if (S.brush.enabled) return;
     if (!isPainting) return;
     applyCell(cellAt(e));
   });
@@ -492,6 +502,222 @@
   canvas.addEventListener('mouseup', () => { isPainting = false; histPainting = false; });
   canvas.addEventListener('mouseleave', () => { isPainting = false; histPainting = false; });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ── Mobile triangle brush ─────────────────────────────────────────────────
+  // Offset cursor: the finger drags the base, the tip (a few cells above the
+  // finger) marks the painted cell so it's never hidden under the fingertip.
+  // Aim (light touch / hovering mouse) shows the brush without painting; a
+  // dwell, a firm press, or a mouse-button press "commits" and begins drawing;
+  // dragging while committed paints each new cell the tip crosses.
+  const DWELL_MS = 400;
+  // Firmness uses the device's reported pointer pressure against an absolute
+  // threshold. Pressure readings are copied into a per-gesture buffer and read
+  // from there; the buffer is cleared on lift so Chrome's stale-pressure
+  // carryover from the previous touch can't leak into a fresh gesture.
+  const FIRM_PRESSURE_HI = 0.70;     // firm when buffered pressure > 0.7000 (tuned for fingertip)
+  const BRUSH_LIFT = 7;              // px the whole triangle floats above finger
+  const BRUSH_DEBUG = true;          // temporary: on-screen firmness readout
+  let brushCursor = null;
+  let brushDebugEl = null;
+  let dwellTimer = null;
+  let pressureBuffer = null;         // latest pressure reading this gesture (null = cleared)
+
+  function brushDebug(e) {
+    if (!BRUSH_DEBUG) return;
+    if (!brushDebugEl) brushDebugEl = document.getElementById('brushDebug');
+    if (!brushDebugEl) return;
+    if (!S.brush.enabled) { brushDebugEl.classList.add('hidden'); return; }
+    const buf = pressureBuffer === null ? '-' : pressureBuffer.toFixed(3);
+    brushDebugEl.classList.remove('hidden');
+    brushDebugEl.textContent =
+      `type:${e.pointerType}\n` +
+      `press:${(e.pressure || 0).toFixed(3)} w:${(e.width || 0).toFixed(1)} h:${(e.height || 0).toFixed(1)}\n` +
+      `buffer:${buf} hi:${FIRM_PRESSURE_HI}\n` +
+      `firm:${S.brush.firmActive} mode:${S.brush.mode}`;
+  }
+
+  function brushReachPx() {
+    // Size the brush off the 16-grid scale regardless of the actual grid size,
+    // so the triangle stays the same on-screen size on 16×16 and 32×32.
+    const rect = canvas.getBoundingClientRect();
+    const referenceCell = rect.width / 16;
+    return 2.2 * referenceCell;
+  }
+
+  function brushTipCell(clientX, clientY) {
+    return cellAtPoint(clientX, clientY - brushReachPx() - BRUSH_LIFT);
+  }
+
+  function positionBrushCursor(clientX, clientY) {
+    if (!brushCursor) brushCursor = document.getElementById('brushCursor');
+    if (!brushCursor) return;
+    const h = brushReachPx();
+    brushCursor.style.height = h + 'px';
+    brushCursor.style.width = (h * 100 / 120) + 'px';
+    // Float the base BRUSH_LIFT above the finger (so the fingertip doesn't cover
+    // the triangle); the tip then lands h+lift above the finger — exactly the
+    // point brushTipCell() samples.
+    brushCursor.style.transform =
+      `translate(${clientX}px, ${clientY - BRUSH_LIFT}px) translate(-50%, -100%)`;
+  }
+
+  // Copy this event's pressure into the per-gesture buffer.
+  function bufferPressure(e) {
+    pressureBuffer = e.pressure || 0;
+  }
+
+  // Is the pointer currently "hard"? Mouse: any held button. Touch: read the
+  // buffered pressure against the absolute high threshold (> 0.9500 = firm,
+  // <= 0.9500 = soft). Reading from the buffer (cleared on lift) keeps a stale
+  // pressure value from the previous touch out of a fresh gesture.
+  function isFirmNow(e) {
+    if (e.pointerType === 'mouse') return (e.buttons & 1) === 1;
+    if (pressureBuffer === null) return false;
+    return pressureBuffer > FIRM_PRESSURE_HI;
+  }
+
+  function pulseBrush() {
+    if (!brushCursor) brushCursor = document.getElementById('brushCursor');
+    if (!brushCursor) return;
+    brushCursor.classList.remove('pulse');
+    void brushCursor.getBoundingClientRect();   // reflow so the animation restarts
+    brushCursor.classList.add('pulse');
+  }
+
+  function showBrushCursor(show) {
+    if (!brushCursor) brushCursor = document.getElementById('brushCursor');
+    if (brushCursor) brushCursor.classList.toggle('hidden', !show);
+  }
+
+  function clearDwell() {
+    if (dwellTimer !== null) { clearTimeout(dwellTimer); dwellTimer = null; }
+  }
+
+  function armDwell() {
+    clearDwell();
+    dwellTimer = setTimeout(() => {
+      dwellTimer = null;
+      if (S.brush.down && S.brush.phase === 'aim') brushCommit();
+    }, DWELL_MS);
+  }
+
+  // Auto mode: dwell timer fired → latch into a stroke that draws until lift.
+  function brushCommit() {
+    clearDwell();
+    S.brush.phase = 'draw';
+    if (navigator.vibrate) navigator.vibrate(10);
+    startHistoryTimer();
+    applyCell(S.brush.tipCell);
+  }
+
+  // Manual mode: drawing is momentary — active only while the pointer is hard.
+  // Called on every pointerdown/move; toggles firmActive on the soft↔hard edges.
+  function handleManualFirm(e, moved) {
+    const firm = isFirmNow(e);
+    if (firm && !S.brush.firmActive) {          // soft → hard
+      S.brush.firmActive = true;
+      pulseBrush();
+      if (navigator.vibrate) navigator.vibrate(10);
+      startHistoryTimer();
+      applyCell(S.brush.tipCell);
+    } else if (firm && S.brush.firmActive) {    // still hard: keep painting
+      if (moved) applyCell(S.brush.tipCell);
+    } else if (!firm && S.brush.firmActive) {   // hard → soft: stop, reposition
+      S.brush.firmActive = false;
+      histPainting = false;
+    }
+  }
+
+  function endBrush() {
+    clearDwell();
+    S.brush.down = false;
+    S.brush.phase = 'aim';
+    S.brush.firmActive = false;
+    S.brush.tipCell = null;
+    pressureBuffer = null;   // clear buffer on lift so no stale pressure carries over
+    histPainting = false;
+    showBrushCursor(false);
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!S.brush.enabled) return;
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    S.brush.down = true;
+    S.brush.phase = 'aim';
+    S.brush.firmActive = false;
+    bufferPressure(e);
+    positionBrushCursor(e.clientX, e.clientY);
+    S.brush.tipCell = brushTipCell(e.clientX, e.clientY);
+    showBrushCursor(true);
+    brushDebug(e);
+    if (S.brush.mode === 'manual') {
+      handleManualFirm(e, false);              // mouse: button already down = paint
+    } else if (e.pointerType === 'mouse') {
+      brushCommit();                           // auto + mouse: click = immediate draw
+    } else {
+      armDwell();                              // auto + touch: hold to start
+    }
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!S.brush.enabled) return;
+    positionBrushCursor(e.clientX, e.clientY);
+    if (S.brush.down) bufferPressure(e);
+    brushDebug(e);
+    if (!S.brush.down) return;   // mouse hover with no button = pure aiming
+    const cell = brushTipCell(e.clientX, e.clientY);
+    const moved = !sameCell(cell, S.brush.tipCell);
+    S.brush.tipCell = cell;
+    if (S.brush.mode === 'manual') {
+      // Momentary: paint only while hard; light = aim/reposition.
+      handleManualFirm(e, moved);
+    } else if (S.brush.phase === 'draw') {
+      if (moved) applyCell(cell);
+    } else {
+      // Auto aim: settling on a cell for DWELL_MS commits; sliding restarts it.
+      if (moved) armDwell();
+    }
+  });
+
+  canvas.addEventListener('pointerup', (e) => {
+    if (!S.brush.enabled) return;
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    endBrush();
+  });
+  canvas.addEventListener('pointercancel', () => { if (S.brush.enabled) endBrush(); });
+  canvas.addEventListener('pointerleave', (e) => {
+    if (!S.brush.enabled) return;
+    if (e.pointerType === 'mouse' && !S.brush.down) showBrushCursor(false);
+  });
+
+  function sameCell(a, b) {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return a.row === b.row && a.col === b.col;
+  }
+
+  function updateBrushCheck() {
+    const btn = document.getElementById('brushToggle');
+    if (btn) btn.classList.toggle('active', S.brush.enabled);
+  }
+
+  function updateBrushModeButtons() {
+    const auto = document.getElementById('brushModeAuto');
+    const manual = document.getElementById('brushModeManual');
+    if (auto) auto.classList.toggle('active', S.brush.mode === 'auto');
+    if (manual) manual.classList.toggle('active', S.brush.mode === 'manual');
+  }
+
+  function applyBrushMode() {
+    canvas.style.touchAction = S.brush.enabled ? 'none' : '';
+    canvas.style.cursor = S.brush.enabled ? 'none' : '';
+    const flank = document.getElementById('paletteFlank');
+    if (flank) flank.classList.toggle('modes-on', S.brush.enabled);
+    if (!S.brush.enabled) endBrush();
+    updateBrushCheck();
+    updateBrushModeButtons();
+  }
 
   // ── Transform panel ───────────────────────────────────────────────────────
   function buildTransformPanel() {
@@ -992,27 +1218,21 @@
   }
 
   // ── Resizable preview panel (grab either edge bar) ────────────────────────
-  // Normal layout: drag resizes total preview width, clamped 200–320px (start 260).
-  // Collapsed layout: drag nudges the 50/50 split ±50px via --collapsed-bias.
+  // Drag resizes total preview width, clamped 200–320px (start 260).
+  // Desktop only — the handles are hidden on the collapsed mobile layout.
   function initPreviewResize() {
     const root = document.documentElement;
-    const app = document.querySelector('.app');
     const BASE = 260, MIN = 200, MAX = 320;
     function drag(handleId, sign) {
       const handle = document.getElementById(handleId);
       handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         const startX = e.clientX;
-        const collapsed = app.classList.contains('collapsed');
-        const cssVar = collapsed ? '--collapsed-bias' : '--preview-w';
-        const start = parseFloat(getComputedStyle(root).getPropertyValue(cssVar))
-                      || (collapsed ? 0 : BASE);
+        const start = parseFloat(getComputedStyle(root).getPropertyValue('--preview-w')) || BASE;
         function onMove(ev) {
           const delta = (ev.clientX - startX) * sign;   // grow when dragging outward
-          const next = collapsed
-            ? Math.max(-50, Math.min(50, start + delta))
-            : Math.max(MIN, Math.min(MAX, start + delta));
-          root.style.setProperty(cssVar, next + 'px');
+          const next = Math.max(MIN, Math.min(MAX, start + delta));
+          root.style.setProperty('--preview-w', next + 'px');
         }
         function onUp() {
           window.removeEventListener('mousemove', onMove);
@@ -1045,6 +1265,29 @@
       btn.addEventListener('click', () => setMode(btn.dataset.mode)));
     mq.addEventListener('change', apply);
     apply();
+
+    // Edge-swipe to switch views (mobile only). Starting near a screen edge
+    // keeps the canvas interior free for drawing/tapping.
+    const EDGE = 30, DIST = 50;
+    let sx = 0, sy = 0, fromEdge = null;   // 'left' | 'right' | null
+    window.addEventListener('touchstart', (e) => {
+      if (!app.classList.contains('collapsed')) { fromEdge = null; return; }
+      // Don't let an edge-started brush stroke double as a view-switch swipe.
+      if (S.brush.enabled && e.target === canvas) { fromEdge = null; return; }
+      const t = e.touches[0]; sx = t.clientX; sy = t.clientY;
+      fromEdge = sx <= EDGE ? 'left' : (sx >= window.innerWidth - EDGE ? 'right' : null);
+    }, { passive: true });
+    window.addEventListener('touchend', (e) => {
+      if (!fromEdge || !app.classList.contains('collapsed')) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Math.abs(dx) >= DIST && Math.abs(dx) > Math.abs(dy)) {
+        const drawing = app.classList.contains('mode-draw');
+        if (drawing && fromEdge === 'right' && dx < 0) setMode('transform');
+        else if (!drawing && fromEdge === 'left' && dx > 0) setMode('draw');
+      }
+      fromEdge = null;
+    }, { passive: true });
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
@@ -1081,6 +1324,26 @@
     document.querySelectorAll('.theme-opt').forEach(btn =>
       btn.addEventListener('click', () => applyTheme(btn.dataset.theme)));
 
+    // Mobile brush toggle (inside Whatnot menu). Default ON for small screens.
+    S.brush.enabled = window.matchMedia('(max-width: 640px)').matches;
+    applyBrushMode();
+    const brushToggle = document.getElementById('brushToggle');
+    if (brushToggle) brushToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      S.brush.enabled = !S.brush.enabled;
+      applyBrushMode();
+    });
+    const setBrushMode = (mode) => {
+      if (S.brush.mode === mode) return;
+      endBrush();
+      S.brush.mode = mode;
+      updateBrushModeButtons();
+    };
+    const bmAuto = document.getElementById('brushModeAuto');
+    const bmManual = document.getElementById('brushModeManual');
+    if (bmAuto) bmAuto.addEventListener('click', () => setBrushMode('auto'));
+    if (bmManual) bmManual.addEventListener('click', () => setBrushMode('manual'));
+
     // File menu
     const menuBtn = document.getElementById('fileMenuBtn');
     const dropdown = document.getElementById('fileDropdown');
@@ -1110,6 +1373,26 @@
     });
 
     document.getElementById('cmdSave').addEventListener('click', saveSga);
+
+    // Demos list (auto-populated from web/public/demo_sprites/ via /api/demos)
+    const prettyDemoName = (f) =>
+      f.replace(/\.sga$/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    fetch('api/demos').then(r => r.json()).then(files => {
+      const list = document.getElementById('demoList');
+      if (!files.length) { list.textContent = '(none)'; return; }
+      files.forEach(f => {
+        const b = document.createElement('button');
+        b.textContent = prettyDemoName(f);
+        b.addEventListener('click', async () => {
+          dropdown.classList.add('hidden');
+          try {
+            const blob = await fetch('demo_sprites/' + encodeURIComponent(f)).then(r => r.blob());
+            await loadSga(blob);
+          } catch (e) { alert('Could not load demo: ' + e.message); }
+        });
+        list.appendChild(b);
+      });
+    }).catch(() => {});
 
     // Palette theme dropdown
     const themeSelect = document.getElementById('themeSelect');

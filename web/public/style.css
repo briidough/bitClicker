@@ -15,7 +15,6 @@
   --frame-w:     10px;
   --frame-color: #5a3a90;
   --preview-w: 260px;
-  --collapsed-bias: 0px;
   --grid-glow:    rgba(90,58,144,0.4);
   --preview-glow: rgba(0,229,255,0.12);
 }
@@ -43,6 +42,8 @@
 html, body {
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;   /* no pull-to-refresh / bounce while drawing */
+  touch-action: manipulation;  /* kill double-tap zoom; canvas overrides to none */
   font-family: 'Courier New', Courier, monospace;
   font-size: 12px;
   color: var(--fg-text);
@@ -120,14 +121,67 @@ body {
   margin: 3px 0;
 }
 
-.size-opt .check, .theme-opt .check {
+.demo-label {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--border-hi);
+  padding: 4px 14px 2px;
+}
+
+.demo-list {
+  display: flex;
+  flex-direction: column;
+  color: var(--border-hi);
+  font-size: 11px;
+}
+
+.demo-list:empty,
+.demo-list:not(:has(button)) { padding: 0 14px 2px; }
+
+.demo-list button { padding-left: 22px; }
+
+.size-opt .check, .theme-opt .check, #brushToggle .check {
   display: inline-block;
   width: 14px;
   color: var(--fg-accent);
   opacity: 0;
 }
 
-.size-opt.active .check, .theme-opt.active .check { opacity: 1; }
+.size-opt.active .check, .theme-opt.active .check, #brushToggle.active .check { opacity: 1; }
+
+/* ── Mobile triangle brush cursor ────────────────────────────────── */
+#brushCursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9999;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+#brushCursor.hidden { display: none; }
+
+/* Temporary firmness readout for cross-browser tuning */
+#brushDebug {
+  position: fixed;
+  top: 4px;
+  left: 4px;
+  z-index: 10000;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #0f0;
+  font: 11px/1.3 monospace;
+  white-space: pre;
+  pointer-events: none;
+}
+#brushDebug.hidden { display: none; }
+#brushCursor .tri { transform-box: fill-box; transform-origin: 50% 100%; }
+#brushCursor.pulse .tri { animation: brushPulse 220ms ease-out; }
+@keyframes brushPulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
 
 /* ── Buttons ─────────────────────────────────────────────────────── */
 .btn {
@@ -411,6 +465,32 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 34px);
   gap: 5px;
+}
+
+/* Auto/Manual brush-mode buttons flanking the palette (shown only in brush mode) */
+.palette-flank {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+}
+.brush-mode-btn {
+  display: none;
+  width: 72px;
+  border: 2px solid var(--border-hi);
+  border-radius: 4px;
+  background: var(--bg-mid);
+  color: var(--fg-text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.palette-flank.modes-on .brush-mode-btn { display: block; }
+.brush-mode-btn.active {
+  background: var(--fg-selected);
+  border-color: var(--fg-selected);
+  color: var(--bg-darkest);
 }
 
 .swatch {
@@ -701,34 +781,25 @@ input[type="color"] {
 
 .app.collapsed .mode-tabs { display: flex; }
 
-/* preview flexes to fill; ~50% + nudge, instead of its fixed width */
-.app.collapsed .preview-col {
-  flex: 0 1 calc(50% + var(--collapsed-bias));
-  width: auto;
-}
+/* one view at a time: stack panels vertically */
+.app.collapsed .workspace { flex-direction: column; }
 
-/* side panels lose their min-width so they can squeeze to 0 */
 .app.collapsed .editor-col,
-.app.collapsed .transform-col { min-width: 0; }
+.app.collapsed .preview-col,
+.app.collapsed .transform-col { width: auto; min-width: 0; }
 
-/* the inactive side panel squeezes shut */
-.app.collapsed.mode-draw .transform-col,
-.app.collapsed.mode-transform .editor-col {
-  flex: 0 0 0;
-  min-width: 0;
-  width: 0;
-  padding: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-  border: 0;
-}
+/* the desktop-only side resize handles are irrelevant when stacked */
+.app.collapsed .preview-resize { display: none; }
 
-/* the active side panel takes the other ~50% (minus the nudge) */
-.app.collapsed.mode-draw .editor-col,
-.app.collapsed.mode-transform .transform-col {
-  flex: 0 1 calc(50% - var(--collapsed-bias));
-}
+/* DRAW view: only the editor */
+.app.collapsed.mode-draw .preview-col,
+.app.collapsed.mode-draw .transform-col { display: none; }
+.app.collapsed.mode-draw .editor-col { flex: 1 1 auto; }
+
+/* PREVIEW + TRANSFORM view: editor hidden, preview on top, transform below */
+.app.collapsed.mode-transform .editor-col { display: none; }
+.app.collapsed.mode-transform .preview-col { flex: 0 0 auto; border: 0; }
+.app.collapsed.mode-transform .transform-col { flex: 1 1 auto; overflow-y: auto; }
 
 /* draw canvas scales down to fit the narrow column */
 .app.collapsed #grid { max-width: 100%; height: auto; }

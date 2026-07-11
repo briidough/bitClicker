@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 
 const BASE = (process.env.BASE_PATH || '').replace(/\/$/, '');
 const PORT = 4003;
@@ -7,6 +8,14 @@ const PORT = 4003;
 const app = express();
 
 app.use(BASE || '/', express.static(path.join(__dirname, 'public')));
+
+app.get(`${BASE}/api/demos`, (_req, res) => {
+  const dir = path.join(__dirname, 'public', 'demo_sprites');
+  let files = [];
+  try { files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.sga')); }
+  catch (e) { files = []; }
+  res.json(files.sort());
+});
 
 app.get([BASE || '/', `${BASE}/`], (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
