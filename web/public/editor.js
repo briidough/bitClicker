@@ -35,10 +35,13 @@
     loop: { shown: false, enabled: false, gap: null, parked: false },
     // Mobile triangle brush: offset cursor so the paint point (tip) sits above
     // the finger instead of under it. enabled defaults by screen size at init.
-    // mode: 'auto' = draw after a hold (dwell); 'manual' = draw only while
-    // pressing hard (momentary). firmActive tracks the current hard-press in
-    // manual mode.
-    brush: { enabled: false, mode: 'auto', phase: 'aim', down: false, firmActive: false, tipCell: null },
+    // mode: 'auto' = one finger on canvas, pressure-gated (light aims, firm
+    // draws once + a 1s hold starts continuous draw). 'manual' = bimanual —
+    // one finger aims on the canvas, a second finger taps/holds the grey
+    // surface around the canvas to actually draw. Per-mode gesture state
+    // (phase, active pointer ids, timers) lives in module-level vars below,
+    // not here.
+    brush: { enabled: false, mode: 'auto', tipCell: null },
   };
 
   // ── Auto-snapshot history ─────────────────────────────────────────────────
@@ -506,34 +509,81 @@
   // ── Mobile triangle brush ─────────────────────────────────────────────────
   // Offset cursor: the finger drags the base, the tip (a few cells above the
   // finger) marks the painted cell so it's never hidden under the fingertip.
-  // Aim (light touch / hovering mouse) shows the brush without painting; a
-  // dwell, a firm press, or a mouse-button press "commits" and begins drawing;
-  // dragging while committed paints each new cell the tip crosses.
-  const DWELL_MS = 400;
-  // Firmness uses the device's reported pointer pressure against an absolute
-  // threshold. Pressure readings are copied into a per-gesture buffer and read
-  // from there; the buffer is cleared on lift so Chrome's stale-pressure
-  // carryover from the previous touch can't leak into a fresh gesture.
-  const FIRM_PRESSURE_HI = 0.70;     // firm when buffered pressure > 0.7000 (tuned for fingertip)
-  const BRUSH_LIFT = 7;              // px the whole triangle floats above finger
-  const BRUSH_DEBUG = true;          // temporary: on-screen firmness readout
+  //
+  // AUTO (one finger, on canvas): light touch aims only; a firm press draws
+  // one dot and starts a hold timer; holding firm for HOLD_MS charges the
+  // sprite, double-pulses, and switches to continuous drag-paint; releasing
+  // leaves the sprite on screen and fades it out over FADE_OUT_MS (re-touching
+  // before the fade finishes snaps it back to full opacity instantly).
+  //
+  // MANUAL (two fingers): one finger stays on the canvas purely to aim the
+  // brush — it never draws. A second finger taps/holds the grey surface
+  // surrounding the canvas (#brushTapSurface) to actually draw: a quick tap
+  // draws one dot, a held tap (HOLD_MS) charges + double-pulses + starts
+  // continuous draw that follows the aiming finger. Lifting the aiming finger
+  // hides the surface and stops everything.
+  //
+  // All tunable timings/thresholds live in one place below so they're easy to
+  // retune without hunting through the state machine.
+  const BRUSH_CFG = {
+    FIRM_PRESSURE_HI: 0.70,     // firm-press threshold (buffered touch pressure)
+    FULL_PRESSURE_HI: 0.95,     // thumb-level pressure — skip the initial pulse/dot, just wait for the hold
+    HOLD_MS: 1000,              // firm/tap hold duration -> charge + continuous draw
+    CHARGE_MS: 600,             // charge (color-fill) animation duration
+    PULSE_MS: 220,              // single pulse duration (matches the .pulse keyframe)
+    PULSE_GAP_MS: 140,          // gap between the two pulses of a double-pulse
+    FADE_OUT_MS: 2000,          // auto: sprite fade-out after release
+    BRUSH_LIFT: 24,             // px the whole triangle floats above the finger
+    BRUSH_REACH_MULT: 2.2,      // reach = mult * referenceCell
+    OVERLAY_ALPHA: 0.42,        // grey tap-surface opacity (+20% from 0.35)
+    DEBUG_TAP_COUNT: 5,         // taps on Manual to toggle debug mode
+    DEBUG_TAP_WINDOW_MS: 600,   // max gap between taps counted toward the sequence
+    VIBRATE_MS: 10,
+  };
+
   let brushCursor = null;
   let brushDebugEl = null;
-  let dwellTimer = null;
-  let pressureBuffer = null;         // latest pressure reading this gesture (null = cleared)
+  let tapSurfaceEl = null;
+  let pressureBuffer = null;   // latest pressure reading this gesture (null = cleared)
+  let debugMode = false;       // in-memory only — never persisted, off on every load
+  let manualTapCount = 0;      // Manual-button 5-tap debug toggle
+  let manualTapLast = 0;
+
+  // AUTO mode gesture state
+  let autoPointerId = null;
+  let autoPhase = 'idle';      // 'idle' | 'aim' | 'drawOnce' | 'charging' | 'continuous' | 'fading'
+  let autoHoldTimer = null;
+  let autoFadeTimer = null;
+
+  // MANUAL mode gesture state
+  let manualCanvasPointerId = null;   // aiming finger, on the canvas
+  let manualTapPointerId = null;      // drawing finger, on #brushTapSurface
+  let manualHoldTimer = null;
+  let manualDrawing = false;          // continuous draw active (tap finger held past HOLD_MS)
 
   function brushDebug(e) {
-    if (!BRUSH_DEBUG) return;
+    if (!debugMode) return;
     if (!brushDebugEl) brushDebugEl = document.getElementById('brushDebug');
     if (!brushDebugEl) return;
     if (!S.brush.enabled) { brushDebugEl.classList.add('hidden'); return; }
     const buf = pressureBuffer === null ? '-' : pressureBuffer.toFixed(3);
+    const detail = S.brush.mode === 'manual'
+      ? `canvasFinger:${manualCanvasPointerId !== null} tapFinger:${manualTapPointerId !== null} drawing:${manualDrawing}`
+      : `phase:${autoPhase}`;
     brushDebugEl.classList.remove('hidden');
     brushDebugEl.textContent =
       `type:${e.pointerType}\n` +
       `press:${(e.pressure || 0).toFixed(3)} w:${(e.width || 0).toFixed(1)} h:${(e.height || 0).toFixed(1)}\n` +
-      `buffer:${buf} hi:${FIRM_PRESSURE_HI}\n` +
-      `firm:${S.brush.firmActive} mode:${S.brush.mode}`;
+      `buffer:${buf} hi:${BRUSH_CFG.FIRM_PRESSURE_HI}\n` +
+      `mode:${S.brush.mode} ${detail}`;
+  }
+
+  function updateDebugUI() {
+    document.body.classList.toggle('debug-on', debugMode);
+    if (!debugMode) {
+      if (!brushDebugEl) brushDebugEl = document.getElementById('brushDebug');
+      if (brushDebugEl) brushDebugEl.classList.add('hidden');
+    }
   }
 
   function brushReachPx() {
@@ -541,11 +591,11 @@
     // so the triangle stays the same on-screen size on 16×16 and 32×32.
     const rect = canvas.getBoundingClientRect();
     const referenceCell = rect.width / 16;
-    return 2.2 * referenceCell;
+    return BRUSH_CFG.BRUSH_REACH_MULT * referenceCell;
   }
 
   function brushTipCell(clientX, clientY) {
-    return cellAtPoint(clientX, clientY - brushReachPx() - BRUSH_LIFT);
+    return cellAtPoint(clientX, clientY - brushReachPx() - BRUSH_CFG.BRUSH_LIFT);
   }
 
   function positionBrushCursor(clientX, clientY) {
@@ -558,7 +608,7 @@
     // the triangle); the tip then lands h+lift above the finger — exactly the
     // point brushTipCell() samples.
     brushCursor.style.transform =
-      `translate(${clientX}px, ${clientY - BRUSH_LIFT}px) translate(-50%, -100%)`;
+      `translate(${clientX}px, ${clientY - BRUSH_CFG.BRUSH_LIFT}px) translate(-50%, -100%)`;
   }
 
   // Copy this event's pressure into the per-gesture buffer.
@@ -567,13 +617,13 @@
   }
 
   // Is the pointer currently "hard"? Mouse: any held button. Touch: read the
-  // buffered pressure against the absolute high threshold (> 0.9500 = firm,
-  // <= 0.9500 = soft). Reading from the buffer (cleared on lift) keeps a stale
-  // pressure value from the previous touch out of a fresh gesture.
+  // buffered pressure against the absolute high threshold. Reading from the
+  // buffer (cleared on lift) keeps a stale pressure value from the previous
+  // touch out of a fresh gesture.
   function isFirmNow(e) {
     if (e.pointerType === 'mouse') return (e.buttons & 1) === 1;
     if (pressureBuffer === null) return false;
-    return pressureBuffer > FIRM_PRESSURE_HI;
+    return pressureBuffer > BRUSH_CFG.FIRM_PRESSURE_HI;
   }
 
   function pulseBrush() {
@@ -584,112 +634,389 @@
     brushCursor.classList.add('pulse');
   }
 
+  function doublePulse() {
+    pulseBrush();
+    setTimeout(pulseBrush, BRUSH_CFG.PULSE_MS + BRUSH_CFG.PULSE_GAP_MS);
+  }
+
+  // Fill color for the charge effect: whatever the user currently has selected
+  // to draw with, so the sprite fills with the same color it's about to paint.
+  function syncBrushFillColor() {
+    const color = S.erasing ? '#808080' : (S.activeColor || '#000000');
+    document.documentElement.style.setProperty('--brush-fill-color', color);
+  }
+
+  // Charge: fill the triangle from base to point with the selected color, as
+  // if the color is welling up before it "comes out" once continuous auto-draw
+  // starts. The fill persists (does not auto-clear) until the next gesture
+  // resets it — see resetBrushFill().
+  function startCharge() {
+    if (!brushCursor) brushCursor = document.getElementById('brushCursor');
+    if (!brushCursor) return;
+    syncBrushFillColor();
+    brushCursor.classList.remove('charging');
+    void brushCursor.getBoundingClientRect();   // reflow so the fill restarts from empty
+    brushCursor.classList.add('charging');
+  }
+
+  function resetBrushFill() {
+    if (!brushCursor) brushCursor = document.getElementById('brushCursor');
+    if (brushCursor) brushCursor.classList.remove('charging');
+  }
+
   function showBrushCursor(show) {
     if (!brushCursor) brushCursor = document.getElementById('brushCursor');
     if (brushCursor) brushCursor.classList.toggle('hidden', !show);
   }
 
-  function clearDwell() {
-    if (dwellTimer !== null) { clearTimeout(dwellTimer); dwellTimer = null; }
+  // Cancel a fade-out in progress and snap the sprite back to full opacity
+  // instantly (no transition) — used whenever a fresh auto gesture begins.
+  function snapBrushOpacity() {
+    if (!brushCursor) brushCursor = document.getElementById('brushCursor');
+    if (!brushCursor) return;
+    brushCursor.classList.remove('fading');
+    brushCursor.classList.add('snap');
   }
 
-  function armDwell() {
-    clearDwell();
-    dwellTimer = setTimeout(() => {
-      dwellTimer = null;
-      if (S.brush.down && S.brush.phase === 'aim') brushCommit();
-    }, DWELL_MS);
+  function resetAutoHoldTimer() {
+    if (autoHoldTimer !== null) { clearTimeout(autoHoldTimer); autoHoldTimer = null; }
   }
 
-  // Auto mode: dwell timer fired → latch into a stroke that draws until lift.
-  function brushCommit() {
-    clearDwell();
-    S.brush.phase = 'draw';
-    if (navigator.vibrate) navigator.vibrate(10);
-    startHistoryTimer();
-    applyCell(S.brush.tipCell);
+  function cancelAutoFade() {
+    if (autoFadeTimer !== null) { clearTimeout(autoFadeTimer); autoFadeTimer = null; }
   }
 
-  // Manual mode: drawing is momentary — active only while the pointer is hard.
-  // Called on every pointerdown/move; toggles firmActive on the soft↔hard edges.
-  function handleManualFirm(e, moved) {
-    const firm = isFirmNow(e);
-    if (firm && !S.brush.firmActive) {          // soft → hard
-      S.brush.firmActive = true;
+  // Auto mode: hold timer fired after a 1s firm press — charge, double-pulse,
+  // then switch into continuous drag-paint.
+  function autoHoldFire() {
+    autoHoldTimer = null;
+    autoPhase = 'charging';
+    startCharge();
+    setTimeout(() => {
+      doublePulse();
+      if (navigator.vibrate) navigator.vibrate(BRUSH_CFG.VIBRATE_MS);
+      setTimeout(() => {
+        if (autoPhase === 'charging') autoPhase = 'continuous';
+      }, BRUSH_CFG.PULSE_MS * 2 + BRUSH_CFG.PULSE_GAP_MS);
+    }, BRUSH_CFG.CHARGE_MS);
+  }
+
+  function startAutoGesture(e) {
+    cancelAutoFade();
+    resetAutoHoldTimer();
+    autoPointerId = e.pointerId;
+    snapBrushOpacity();
+    resetBrushFill();
+    if (e.pointerType === 'mouse') {
+      // Mouse: click = immediate single dot, drag while held = continuous paint.
+      autoPhase = 'continuous';
       pulseBrush();
-      if (navigator.vibrate) navigator.vibrate(10);
+      if (navigator.vibrate) navigator.vibrate(BRUSH_CFG.VIBRATE_MS);
       startHistoryTimer();
       applyCell(S.brush.tipCell);
-    } else if (firm && S.brush.firmActive) {    // still hard: keep painting
-      if (moved) applyCell(S.brush.tipCell);
-    } else if (!firm && S.brush.firmActive) {   // hard → soft: stop, reposition
-      S.brush.firmActive = false;
-      histPainting = false;
+      return;
+    }
+    autoPhase = 'aim';   // light touch: aim only, no draw yet
+  }
+
+  function handleAutoMove(e, cell, moved) {
+    if (e.pointerType === 'mouse') {
+      if (autoPhase === 'continuous' && moved) applyCell(cell);
+      return;
+    }
+    if (autoPhase === 'aim') {
+      if (isFirmNow(e)) {
+        autoPhase = 'drawOnce';
+        startHistoryTimer();
+        // Thumb-level (full) pressure: skip the pulse + initial dot entirely —
+        // just sit quietly until the hold fires, then charge/pulse as usual.
+        const full = pressureBuffer !== null && pressureBuffer >= BRUSH_CFG.FULL_PRESSURE_HI;
+        if (!full) {
+          pulseBrush();
+          if (navigator.vibrate) navigator.vibrate(BRUSH_CFG.VIBRATE_MS);
+          applyCell(cell);
+        }
+        resetAutoHoldTimer();
+        autoHoldTimer = setTimeout(autoHoldFire, BRUSH_CFG.HOLD_MS);
+      }
+    } else if (autoPhase === 'drawOnce') {
+      if (!isFirmNow(e)) {
+        // Pressure dropped before the hold fired — cancel the charge, back to aim.
+        resetAutoHoldTimer();
+        autoPhase = 'aim';
+      }
+      // Still just drawOnce/charging-pending: no continuous painting yet.
+    } else if (autoPhase === 'continuous') {
+      if (moved) applyCell(cell);
+    }
+    // 'charging': ignore moves until the charge sequence resolves to continuous.
+  }
+
+  function endAutoGesture(e) {
+    resetAutoHoldTimer();
+    autoPointerId = null;
+    histPainting = false;
+    pressureBuffer = null;
+    if (e && e.pointerType === 'mouse') {
+      autoPhase = 'idle';
+      showBrushCursor(false);
+      brushCursor && brushCursor.classList.remove('fading', 'charging');
+      return;
+    }
+    autoPhase = 'fading';
+    if (brushCursor) {
+      // Leave 'charging' (the color fill) as-is so the filled sprite fades
+      // out as a whole, rather than snapping back to empty before it fades.
+      brushCursor.classList.remove('snap');
+      void brushCursor.getBoundingClientRect();   // reflow so the fade transition restarts cleanly
+      brushCursor.classList.add('fading');
+    }
+    cancelAutoFade();
+    autoFadeTimer = setTimeout(() => {
+      autoFadeTimer = null;
+      autoPhase = 'idle';
+      showBrushCursor(false);
+      if (brushCursor) brushCursor.classList.remove('fading');
+    }, BRUSH_CFG.FADE_OUT_MS);
+  }
+
+  // ── Manual mode: bimanual (aim finger on canvas, draw finger on the overlay) ──
+
+  function positionTapSurface() {
+    if (!tapSurfaceEl) tapSurfaceEl = document.getElementById('brushTapSurface');
+    if (!tapSurfaceEl) return;
+    const rect = canvas.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const top = tapSurfaceEl.querySelector('.strip-top');
+    const bottom = tapSurfaceEl.querySelector('.strip-bottom');
+    const left = tapSurfaceEl.querySelector('.strip-left');
+    const right = tapSurfaceEl.querySelector('.strip-right');
+    if (top) {
+      top.style.left = '0px'; top.style.top = '0px';
+      top.style.width = vw + 'px'; top.style.height = Math.max(0, rect.top) + 'px';
+    }
+    if (bottom) {
+      bottom.style.left = '0px'; bottom.style.top = Math.max(0, rect.bottom) + 'px';
+      bottom.style.width = vw + 'px'; bottom.style.height = Math.max(0, vh - rect.bottom) + 'px';
+    }
+    if (left) {
+      left.style.left = '0px'; left.style.top = Math.max(0, rect.top) + 'px';
+      left.style.width = Math.max(0, rect.left) + 'px'; left.style.height = Math.max(0, rect.bottom - rect.top) + 'px';
+    }
+    if (right) {
+      right.style.left = Math.max(0, rect.right) + 'px'; right.style.top = Math.max(0, rect.top) + 'px';
+      right.style.width = Math.max(0, vw - rect.right) + 'px'; right.style.height = Math.max(0, rect.bottom - rect.top) + 'px';
     }
   }
 
-  function endBrush() {
-    clearDwell();
-    S.brush.down = false;
-    S.brush.phase = 'aim';
-    S.brush.firmActive = false;
-    S.brush.tipCell = null;
-    pressureBuffer = null;   // clear buffer on lift so no stale pressure carries over
+  function showTapSurface(show) {
+    if (!tapSurfaceEl) tapSurfaceEl = document.getElementById('brushTapSurface');
+    if (!tapSurfaceEl) return;
+    if (show) positionTapSurface();
+    tapSurfaceEl.classList.toggle('hidden', !show);
+  }
+
+  function stopManualDrawing() {
+    if (manualHoldTimer !== null) { clearTimeout(manualHoldTimer); manualHoldTimer = null; }
+    manualDrawing = false;
     histPainting = false;
+  }
+
+  function startManualAim(e) {
+    manualCanvasPointerId = e.pointerId;
+    resetBrushFill();
+    showTapSurface(true);
+  }
+
+  function endManualAim() {
+    manualCanvasPointerId = null;
+    manualTapPointerId = null;
+    stopManualDrawing();
+    resetBrushFill();
+    showTapSurface(false);
     showBrushCursor(false);
+    hideTapPulse();
+    pressureBuffer = null;
+  }
+
+  function manualHoldFire() {
+    manualHoldTimer = null;
+    startCharge();
+    setTimeout(() => {
+      doublePulse();
+      if (navigator.vibrate) navigator.vibrate(BRUSH_CFG.VIBRATE_MS);
+      setTimeout(() => {
+        manualDrawing = true;
+        startHistoryTimer();
+        applyCell(S.brush.tipCell);
+      }, BRUSH_CFG.PULSE_MS * 2 + BRUSH_CFG.PULSE_GAP_MS);
+    }, BRUSH_CFG.CHARGE_MS);
+  }
+
+  let tapPulseEl = null;
+  function showTapPulse(clientX, clientY) {
+    if (!tapPulseEl) tapPulseEl = document.getElementById('tapPulseFx');
+    if (!tapPulseEl) return;
+    // Position via left/top (not transform) — the pulse keyframe animates
+    // transform:scale() itself, which would otherwise clobber a translate().
+    tapPulseEl.style.left = clientX + 'px';
+    tapPulseEl.style.top = clientY + 'px';
+    tapPulseEl.classList.remove('hidden', 'pulse');
+    void tapPulseEl.getBoundingClientRect();   // reflow so the animation restarts
+    tapPulseEl.classList.add('pulse');
+  }
+
+  // Force the ripple to its fully-cleared state — used whenever the manual
+  // overlay/gesture tears down, so a mid-animation ripple can't linger after
+  // the aiming finger lifts.
+  function hideTapPulse() {
+    if (!tapPulseEl) tapPulseEl = document.getElementById('tapPulseFx');
+    if (!tapPulseEl) return;
+    tapPulseEl.classList.remove('pulse');
+    tapPulseEl.classList.add('hidden');
+  }
+
+  function handleTapPointerDown(e) {
+    if (manualCanvasPointerId === null) return;   // aiming finger must be down first
+    e.preventDefault();
+    try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
+    manualTapPointerId = e.pointerId;
+    showTapPulse(e.clientX, e.clientY);
+    if (manualHoldTimer !== null) clearTimeout(manualHoldTimer);
+    manualHoldTimer = setTimeout(manualHoldFire, BRUSH_CFG.HOLD_MS);
+  }
+
+  function handleTapPointerUp(e) {
+    if (e.pointerId !== manualTapPointerId) return;
+    if (manualHoldTimer !== null) {
+      // Released before the hold fired: quick tap draws a single dot.
+      clearTimeout(manualHoldTimer);
+      manualHoldTimer = null;
+      pulseBrush();
+      if (navigator.vibrate) navigator.vibrate(BRUSH_CFG.VIBRATE_MS);
+      startHistoryTimer();
+      applyCell(S.brush.tipCell);
+    }
+    stopManualDrawing();
+    manualTapPointerId = null;
+  }
+
+  function endBrush() {
+    resetAutoHoldTimer();
+    cancelAutoFade();
+    autoPointerId = null;
+    autoPhase = 'idle';
+    manualCanvasPointerId = null;
+    manualTapPointerId = null;
+    stopManualDrawing();
+    pressureBuffer = null;
+    histPainting = false;
+    S.brush.tipCell = null;
+    showBrushCursor(false);
+    showTapSurface(false);
+    hideTapPulse();
+    if (brushCursor) brushCursor.classList.remove('fading', 'charging', 'pulse');
   }
 
   canvas.addEventListener('pointerdown', (e) => {
     if (!S.brush.enabled) return;
     e.preventDefault();
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-    S.brush.down = true;
-    S.brush.phase = 'aim';
-    S.brush.firmActive = false;
-    bufferPressure(e);
     positionBrushCursor(e.clientX, e.clientY);
     S.brush.tipCell = brushTipCell(e.clientX, e.clientY);
     showBrushCursor(true);
-    brushDebug(e);
     if (S.brush.mode === 'manual') {
-      handleManualFirm(e, false);              // mouse: button already down = paint
-    } else if (e.pointerType === 'mouse') {
-      brushCommit();                           // auto + mouse: click = immediate draw
+      startManualAim(e);
     } else {
-      armDwell();                              // auto + touch: hold to start
+      bufferPressure(e);
+      startAutoGesture(e);
     }
+    brushDebug(e);
   });
 
   canvas.addEventListener('pointermove', (e) => {
     if (!S.brush.enabled) return;
     positionBrushCursor(e.clientX, e.clientY);
-    if (S.brush.down) bufferPressure(e);
+    const isActivePointer = S.brush.mode === 'manual'
+      ? e.pointerId === manualCanvasPointerId
+      : e.pointerId === autoPointerId;
+    if (S.brush.mode !== 'manual' && isActivePointer) bufferPressure(e);
     brushDebug(e);
-    if (!S.brush.down) return;   // mouse hover with no button = pure aiming
+    if (!isActivePointer) return;   // mouse hover with no button = pure aiming
     const cell = brushTipCell(e.clientX, e.clientY);
     const moved = !sameCell(cell, S.brush.tipCell);
     S.brush.tipCell = cell;
     if (S.brush.mode === 'manual') {
-      // Momentary: paint only while hard; light = aim/reposition.
-      handleManualFirm(e, moved);
-    } else if (S.brush.phase === 'draw') {
-      if (moved) applyCell(cell);
+      if (manualDrawing && moved) applyCell(cell);
     } else {
-      // Auto aim: settling on a cell for DWELL_MS commits; sliding restarts it.
-      if (moved) armDwell();
+      handleAutoMove(e, cell, moved);
     }
   });
 
   canvas.addEventListener('pointerup', (e) => {
     if (!S.brush.enabled) return;
     try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-    endBrush();
+    if (S.brush.mode === 'manual') {
+      if (e.pointerId === manualCanvasPointerId) endManualAim();
+    } else if (e.pointerId === autoPointerId) {
+      endAutoGesture(e);
+    }
   });
-  canvas.addEventListener('pointercancel', () => { if (S.brush.enabled) endBrush(); });
+  canvas.addEventListener('pointercancel', (e) => {
+    if (!S.brush.enabled) return;
+    if (S.brush.mode === 'manual') {
+      if (e.pointerId === manualCanvasPointerId) endManualAim();
+    } else if (e.pointerId === autoPointerId) {
+      endAutoGesture(e);
+    }
+  });
   canvas.addEventListener('pointerleave', (e) => {
     if (!S.brush.enabled) return;
-    if (e.pointerType === 'mouse' && !S.brush.down) showBrushCursor(false);
+    if (e.pointerType === 'mouse' && autoPointerId === null && manualCanvasPointerId === null) {
+      showBrushCursor(false);
+    }
   });
+
+  const tapSurface = document.getElementById('brushTapSurface');
+  if (tapSurface) {
+    tapSurface.addEventListener('pointerdown', (e) => {
+      if (!S.brush.enabled || S.brush.mode !== 'manual') return;
+      handleTapPointerDown(e);
+      brushDebug(e);
+    });
+    tapSurface.addEventListener('pointerup', (e) => {
+      if (!S.brush.enabled || S.brush.mode !== 'manual') return;
+      handleTapPointerUp(e);
+    });
+    tapSurface.addEventListener('pointercancel', (e) => {
+      if (!S.brush.enabled || S.brush.mode !== 'manual') return;
+      handleTapPointerUp(e);
+    });
+  }
+  window.addEventListener('resize', () => {
+    if (tapSurfaceEl && !tapSurfaceEl.classList.contains('hidden')) positionTapSurface();
+  });
+  window.addEventListener('orientationchange', () => {
+    if (tapSurfaceEl && !tapSurfaceEl.classList.contains('hidden')) positionTapSurface();
+  });
+
+  // Manual mode requires two simultaneous touches by design (aim + draw
+  // fingers), so block native pinch-zoom app-wide while the brush is on —
+  // otherwise a two-finger gesture would resize the whole app.
+  let pinchGuardInstalled = false;
+  function pinchGuardHandler(e) {
+    if (e.touches && e.touches.length > 1) e.preventDefault();
+  }
+  function installPinchGuard() {
+    if (pinchGuardInstalled) return;
+    document.addEventListener('touchmove', pinchGuardHandler, { passive: false });
+    pinchGuardInstalled = true;
+  }
+  function removePinchGuard() {
+    if (!pinchGuardInstalled) return;
+    document.removeEventListener('touchmove', pinchGuardHandler, { passive: false });
+    pinchGuardInstalled = false;
+  }
 
   function sameCell(a, b) {
     if (a === b) return true;
@@ -714,7 +1041,15 @@
     canvas.style.cursor = S.brush.enabled ? 'none' : '';
     const flank = document.getElementById('paletteFlank');
     if (flank) flank.classList.toggle('modes-on', S.brush.enabled);
-    if (!S.brush.enabled) endBrush();
+    if (S.brush.enabled) {
+      document.documentElement.style.setProperty('--brush-charge-ms', BRUSH_CFG.CHARGE_MS + 'ms');
+      document.documentElement.style.setProperty('--brush-fade-ms', BRUSH_CFG.FADE_OUT_MS + 'ms');
+      document.documentElement.style.setProperty('--brush-overlay-alpha', String(BRUSH_CFG.OVERLAY_ALPHA));
+      installPinchGuard();
+    } else {
+      endBrush();
+      removePinchGuard();
+    }
     updateBrushCheck();
     updateBrushModeButtons();
   }
@@ -1342,7 +1677,21 @@
     const bmAuto = document.getElementById('brushModeAuto');
     const bmManual = document.getElementById('brushModeManual');
     if (bmAuto) bmAuto.addEventListener('click', () => setBrushMode('auto'));
-    if (bmManual) bmManual.addEventListener('click', () => setBrushMode('manual'));
+    if (bmManual) bmManual.addEventListener('click', () => {
+      // Tapping Manual 5x within the window toggles debug mode (off by
+      // default every load, never persisted). Normal mode selection still
+      // happens on every tap.
+      const now = Date.now();
+      if (now - manualTapLast > BRUSH_CFG.DEBUG_TAP_WINDOW_MS) manualTapCount = 0;
+      manualTapCount++;
+      manualTapLast = now;
+      if (manualTapCount >= BRUSH_CFG.DEBUG_TAP_COUNT) {
+        manualTapCount = 0;
+        debugMode = !debugMode;
+        updateDebugUI();
+      }
+      setBrushMode('manual');
+    });
 
     // File menu
     const menuBtn = document.getElementById('fileMenuBtn');

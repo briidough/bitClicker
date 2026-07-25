@@ -1,0 +1,25 @@
+
+I want auto to act on pressure sensitivity
+
+I want manual to be completely different and act on tapping in the screen, outside of the editor window.
+
+When manual is selected, if the draw sprite is on screen (finger close to screen) I want a grey overlay on the visible app.
+The grey overlay will be the 'tap' surface that when touched will activate the draw function
+if the finger is held on the tap space, wait one second, charge the brush sprite, and twice pulse, then activate continuous draw function active.
+when the finger is taken off the editor panel, remove the grey overlay, stop all drawing.
+
+When auto is selected, I want it to merge the current manual and auto features.
+when a finger is lightly touching, do not activate then sprite but, make it appear.
+when firm press (whatever is defined now) then pulse the brush and draw once
+if the finger is held, wait one second, charge the brush sprite, and pulse twice, then activate continuous draw
+if finger is released, leave the sprite on screen and fade out over 2 seconds.
+if the finger is put back on the editor screen, fade back to opaque snappy and snap the brush to touch location
+
+
+notes:
+this will require multitouch, and will sometimes involve 2 simultaenous touches moving away or together. please make adjustments so that the app elements to no resize and a browser would native do.
+again I may fiddle with the touch sensitivity. could you store the configurable thresholds easily at the top of one of the source files?
+
+the brush debug screen that exists, I want it to be part of a web 'debug' mode. more features may be added to this in the future
+I want to disable or enable debug mode by tapping manual 5 times.
+Leave it off by default, do not retain the state of it. it should be off each time the site is normally loaded.

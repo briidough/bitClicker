@@ -158,6 +158,9 @@ body {
   z-index: 9999;
   pointer-events: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  /* Pulse/charge scale the triangle past its own bbox — without this the
+     SVG's default viewBox clipping cuts the tip off mid-animation. */
+  overflow: visible;
 }
 #brushCursor.hidden { display: none; }
 
@@ -181,6 +184,56 @@ body {
   0%   { transform: scale(1); }
   40%  { transform: scale(1.28); }
   100% { transform: scale(1); }
+}
+
+/* Charge-up: the triangle fills with the selected draw color from the base up
+   to the point, as if the color is welling up before it "comes out" in
+   continuous auto-draw. Fill persists (doesn't reset) until the next gesture. */
+#brushCursor .fill-tri { fill: var(--brush-fill-color, #000000); }
+#brushFillClipRect {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  transform: scaleY(0);
+}
+#brushCursor.charging #brushFillClipRect {
+  transition: transform var(--brush-charge-ms, 600ms) ease-in;
+  transform: scaleY(1);
+}
+
+/* Auto mode: sprite lingers and fades out after release; snaps back instantly
+   if touched again before the fade finishes. */
+#brushCursor.fading { transition: opacity var(--brush-fade-ms, 2000ms) linear; opacity: 0; }
+#brushCursor.snap   { transition: none; opacity: 1; }
+
+/* ── Manual mode: grey tap surface surrounding the canvas ───────────── */
+#brushTapSurface { pointer-events: none; }
+#brushTapSurface.hidden { display: none; }
+#brushTapSurface .strip {
+  position: fixed;
+  pointer-events: auto;
+  background: rgba(120, 120, 120, var(--brush-overlay-alpha, 0.35));
+  touch-action: none;
+}
+
+/* Small ripple where a finger touches the tap surface — quick feedback that
+   the touch registered, distinct from the brush sprite's own pulse. */
+#tapPulseFx {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 72px;
+  height: 72px;
+  margin: -36px 0 0 -36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  z-index: 9998;
+}
+#tapPulseFx.hidden { display: none; }
+#tapPulseFx.pulse { animation: tapPulse 260ms ease-out; }
+@keyframes tapPulse {
+  0%   { transform: scale(0.3); opacity: 0.8; }
+  100% { transform: scale(1.4); opacity: 0; }
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────── */
@@ -269,13 +322,13 @@ body {
 .frame-tab {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   background: var(--bg-mid);
   border: 1px solid var(--border-hi);
   color: var(--fg-text);
   font-family: inherit;
-  font-size: 11px;
-  padding: 3px 8px;
+  font-size: 18px;
+  padding: 5px 12px;
   cursor: pointer;
 }
 
@@ -287,11 +340,11 @@ body {
 
 .del-frame-btn {
   background: none;
-  border: 1px dashed var(--danger);
+  border: 2px dashed var(--danger);
   color: var(--danger);
   font-family: inherit;
-  font-size: 13px;
-  padding: 0 8px 2px;
+  font-size: 16px;
+  padding: 0 10px 4px;
   cursor: pointer;
   line-height: 1;
 }
@@ -351,11 +404,12 @@ body {
 
 .add-frame-btn {
   background: none;
-  border: 1px dashed var(--border-hi);
+  border: 2px dashed var(--border-hi);
   color: var(--border-hi);
+  background: #3ca03c;
   font-family: inherit;
-  font-size: 15px;
-  padding: 0 8px 2px;
+  font-size: 18px;
+  padding: 0 10px 4px;
   cursor: pointer;
   line-height: 1;
 }
