@@ -1,60 +1,172 @@
-╔═══════════════════════════════════════════════════════════╗
-║ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ║
-║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓║
-║▓▓░░░▓▓▓▓░░░░▓▓▓▓▓▓░▓▓▓▓▓▓▓░░░▓▓▓▓▓▓▓▓░▓░▓▓▓▓▓▓░░░░▓▓░▓▓░▓▓║
-║▓▓░▓▓░▓▓▓░▓▓▓▓▓▓▓▓░▓░▓▓▓▓▓▓░▓▓░▓▓▓▓▓▓░▓░▓░▓▓▓▓▓░▓▓▓▓▓░▓▓░▓▓║
-║▓▓░░░▓▓▓▓░░░▓▓▓▓▓░▓▓▓░▓▓▓▓▓░▓▓▓░▓▓▓▓░▓▓░▓▓░▓▓▓▓░░░▓▓▓░▓▓░▓▓║
-║▓▓░▓▓░▓▓▓░▓▓▓▓▓▓░▓░░░▓░▓▓▓▓░▓▓░▓▓▓▓▓░▓▓▓▓▓░▓▓▓▓░▓▓▓▓▓▓▓▓▓▓▓║
-║▓▓░▓▓░▓▓▓░░░░▓▓▓░▓▓▓▓▓░▓▓▓▓░░░▓▓▓▓▓░▓▓▓▓▓▓▓░▓▓▓░░░░▓▓░▓▓░▓▓║
-║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓║
-║ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ║
-╚═══════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════════════════════╗
+║░░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░░║
+║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓║
+║▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░▓▓▓▓░░░░░░▓▓▓▓░░░░░▓▓▓▓░░░░░░▓▓▓▓░░▓▓▓▓▓░░▓▓▓░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓║
+║▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓░░▓▓▓░░▓▓▓▓▓▓▓░░▓▓▓░░▓▓▓░░▓▓▓░░▓▓▓░░░░▓░░░░▓▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓║
+║▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░▓▓▓▓░░░░░▓▓▓▓░░░░░░░▓▓▓░░▓▓▓░░▓▓▓░░▓░░░▓░░▓▓▓░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓║
+║▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓░░▓▓▓▓░░▓▓▓▓▓▓▓░░▓▓▓░░▓▓▓░░▓▓▓░░▓▓▓░░▓▓░▓▓░░▓▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓║
+║▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓░░▓▓▓░░░░░░▓▓▓░░▓▓▓░░▓▓▓░░░░░░▓▓▓▓░░▓▓▓▓▓░░▓▓▓░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓║
+║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓║
+║░░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░ⒷⓇⒾⒾⒹⓄⓊⒼⒽ░░║
+╚═══════════════════════════════════════════════════════════════════════════════════╝
 Hello and welcome to bitclicker
 
-bitClicker is a pixel sprite and animation editor.
-Canvas 16x16 and 32x32 on web, 16 up to 80 on desktop
-Preset color paletes.
-For web, when custom, 
-Build multi-frame animations with pixel transforms like Pop, Morph, Burst, and Spring
-Runs anywhere with Java 11+ — no extra dependencies, just Swing.
+Pixel sprite and animation editor with Java/Swing desktop and mobile friendly web
+front end.
 
-History: while you draw, bitClicker auto-saves snapshots of your whole animation
-every 5 seconds of active drawing. On desktop, click "History" to open the panel
-(keeps 10). On web, a strip below the palette keeps the last 5. Click any snapshot
-to jump back to that state (your current work is saved to history first).
+bitClicker was originally created to make sprite animations for briidough.com.
+It is now a standalone tool for creating and animating pixel sprites.
 
-Frame loop: with 3 or more frames you can loop a two-frame pair. The animation plays
-the intro once, then ping-pongs that pair forever.
-  Desktop: in the row just below the frame tabs, click the loop button (round arrow)
-  to turn it on, then use the left/right arrows to choose which adjacent pair loops.
-  Click the loop button again to turn it off. Play the preview to see it bounce; Step
-  walks straight through the frames and breaks out of the loop.
-  Web: in the draw panel, click the loop button at the right of the row under the
-  frame tabs. A marker drops between two frames — drag it to pick the pair. Drag it
-  under the loop button (or left-click it) to disable; right-click a disabled marker
-  to re-enable.
-The loop is saved inside your .sga file and travels with it. When a looped .bxl
-export plays via bixelPlay, clicking the canvas breaks out of the loop and finishes
-the animation.
+Features
+	16x16, 32x32, 48x48, 64x64, and 80x80 desktop canvases
+	16x16 and 32x32 web canvases
+	Multi-frame Spriteamations
+	Pencil, line, and fill-style drawing
+	Five-color palettes
+	Primary, Neon, Sunset, and Custom palettes
+	Undo and redo
+	Automatic animation history snapshots
+	SVG and raster image import
+	Bulk SVG animation frame import
+	Sprite reference tracing and image fill
+	Animation preview with play, step, and stop
+	Frame pair ping-pong loops
+	Retro desktop theme
+	Mobile-first touch interface
+	Pressure-sensitive mobile brush
+	Pop, Morph, Burst, Twist, and Spring transforms
+	Smooth, Sharp, Snappy, Elastic, Bounce, and Overshoot easing
+	Spriteamation Transforms
 
+Burst
+	Pixels fly outward from a focal point and return.
 
-Requires Java 11 or newer. Verify with java -version.
+Pop
+	Pixels explode outward and return toward a focal point, with optional
+	gravity, wall bouncing, random speeds, and other controls.
 
-	Windows
-		java -jar sprite-editor.jar
-		(or double-click sprite-editor.jar if .jar is associated with Java)
+Morph
+	Pixel-by-pixel transition between frames, including birth and death
+	animations.
 
-	macOS
+Twist
+	Rotates individual pixels in place with configurable spin and smoothing.
 
-		java -jar sprite-editor.jar
+Spring / Jelly
+	Damped spring animation with configurable stiffness, damping, impulse,
+	duration, and hold.
 
-	Linux
-		java -jar sprite-editor.jar
-		
-I'll write more in time...
+See pixel-transforms.txt for detailed transform documentation.
 
-If you read this I did not waste my time. Wow.
+-History
 
+The editor automatically saves a snapshot every 5 seconds of active drawing.
+	Desktop keeps the last 10 snapshots.
+	Web keeps the last 5 snapshots.
 
+	Restoring a snapshot first saves the current state to history.
+
+-Animation Loops
+
+	With three or more frames, an adjacent pair can be selected as a permanent
+	ping-pong loop.
+
+	The intro plays once, then the selected pair repeats.
+
+	Loop information is stored in .sga files and exported to .bxl files.
+
+File Formats
+
+.sga
+	Editable Spriteamation project.
+	ZIP archive containing SVG frames and an anim.json manifest.
+	Read and written by both desktop and web versions.
+
+.bxl
+	Bixel playback/delivery format.
+	JSON containing frames, palette, loop information, and transform settings.
+	Exported by the desktop application.
+
+.spr
+	Single-sprite text format containing region, palette, and grid data.
+
+.svg
+	Single sprite/frame format. Desktop can also bulk-load SVG animation
+	frames.
+
+Raster images
+	Images supported by Java ImageIO can be pasted for tracing or filling.
+
+Bixel Playback
+
+	bixelPlay.js is a zero-dependency JavaScript player for .bxl files.
+
+	It renders Bixels to an HTML canvas.
+
+The web version supports:
+
+	16x16 and 32x32 canvases
+	.sga loading and saving
+	Mobile Brush
+	Pressure-sensitive drawing on compatible devices
+	Five-color palettes
+	Three UI themes
+	Animation transforms
+	History
+	Frame loops
+	Bundled demo Spriteamations
+
+The web version does not export .bxl files.
+
+Docker
+
+	Docker can be used to run the web version locally or deploy it elsewhere.
+
+Docker image:
+
+	briidough/bitclicker-web:v1.3.0
+
+Run:
+
+	docker run -d -p 4003:4003 -e BASE_PATH="" \
+	  briidough/bitclicker-web:v1.3.0
+
+	Then use port 4003.
+
+Docker Compose:
+
+	docker compose up -d
+	
+	APP_PORT can be used to change the host port.
+	
+	BASE_PATH supports deployment below a reverse-proxy sub-path.
+
+Keyboard Shortcuts
+	Ctrl+N          New
+	Ctrl+O          Load
+	Ctrl+L          Load SVG
+	Ctrl+S          Save .spr
+	Ctrl+E          Export SVG
+	Ctrl+Shift+O    Load .sga
+	Ctrl+Shift+S    Save .sga
+	Ctrl+Shift+E    Export .bxl
+	Ctrl+Z          Undo
+	Ctrl+Y          Redo
+	Project
+
+Repository:
+
+	github.com/briidough/bitClicker
+
+Web app:
+
+	bitclicker.briidough.com
+
+Docker:
+
+	briidough/bitclicker-web
+
+License:
+There is no formal license attached to this project.
 
 hiimbrendan icopyrightnothing 202X
